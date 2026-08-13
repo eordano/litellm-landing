@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Live OCR</title>
+  <style>
+    :root {
+      --bg-color: #f0f0f0;
+      --text-color: #111827;
+      --header-bg: #ffffff;
+      --card-bg: #ffffff;
+      --border-color: #e5e7eb;
+      --input-bg: #f9fafb;
+      --input-border: #d1d5db;
+      --input-focus-border: #3b82f6;
+      --button-bg: #1c71d8;
+      --button-text: #ffffff;
+      --button-hover-bg: #1a63bA;
+      --button-disabled-bg: #9ca3af;
+      --pre-bg: #f3f4f6;
+      --link-color: #1c71d8;
+      --subtitle-color: #6b7280;
+      --ok-color: #0f8f6e;
+      --err-color: #c0392b;
+      --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color-scheme: light;
+    }
+    html[data-theme='dark'] {
+      --bg-color: #111827;
+      --text-color: #f9fafb;
+      --header-bg: #1f2937;
+      --card-bg: #1f2937;
+      --border-color: #374151;
+      --input-bg: #374151;
+      --input-border: #4b5563;
+      --input-focus-border: #60a5fa;
+      --button-bg: #3b82f6;
+      --button-hover-bg: #2563eb;
+      --button-disabled-bg: #4b5563;
+      --pre-bg: #1e2c40;
+      --link-color: #60a5fa;
+      --subtitle-color: #9ca3af;
+      --ok-color: #34d399;
+      --err-color: #f87171;
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    [hidden] { display: none !important; }
+    body { background: var(--bg-color); color: var(--text-color); min-height: 100vh; }
+    header { background: var(--header-bg); border-bottom: 1px solid var(--border-color); padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
+    header h1 { font-size: 1.25rem; font-weight: 600; }
+    header nav { display: flex; gap: 1rem; flex-wrap: wrap; }
+    header nav a { color: var(--link-color); text-decoration: none; font-size: 0.875rem; }
+    header nav a:hover { text-decoration: underline; }
+    header nav a[aria-current] { color: var(--subtitle-color); pointer-events: none; }
+    .wrap { max-width: 820px; margin: 0 auto; padding: 1rem 0.75rem 4rem; }
+    @media (min-width: 640px) { .wrap { padding: 2rem 1.5rem 4rem; } }
+    .card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem; box-shadow: var(--shadow); }
+    .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; }
+    .subtitle { color: var(--subtitle-color); font-size: 0.8125rem; line-height: 1.5; margin-bottom: 0.75rem; }
+    button { font: inherit; font-size: 0.875rem; font-weight: 500; padding: 0.5rem 1rem; border-radius: 0.375rem; background: var(--button-bg); color: var(--button-text); border: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    button:hover { background: var(--button-hover-bg); }
+    button[disabled] { background: var(--button-disabled-bg); cursor: progress; }
+    button.ghost { background: var(--input-bg); color: var(--text-color); border: 1px solid var(--input-border); }
+    button.ghost:hover { background: var(--pre-bg); }
+    .row { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.75rem; flex-wrap: wrap; }
+    .meta { font-size: 0.75rem; color: var(--subtitle-color); margin-left: auto; font-family: "SF Mono", Menlo, Consolas, monospace; }
+    .err { color: var(--err-color); font-size: 0.8125rem; margin-top: 0.5rem; white-space: pre-wrap; }
+    .ok { color: var(--ok-color); }
+
+    /* Viewfinder */
+    .stage { position: relative; background: #000; border-radius: 0.5rem; overflow: hidden; min-height: 200px; }
+    .stage video, .stage img.still { display: block; width: 100%; height: auto; }
+    .stage canvas.overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+    .stage .status-pill { position: absolute; top: 0.5rem; left: 0.5rem; background: rgba(0,0,0,0.55); color: #fff; font-size: 0.6875rem; font-family: "SF Mono", Menlo, Consolas, monospace; padding: 0.25rem 0.5rem; border-radius: 999px; }
+    .stage .idle-hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 0.875rem; text-align: center; padding: 1rem; }
+
+    /* Controls under the viewfinder: shutter-centric, thumb-reachable */
+    .controls { display: flex; align-items: center; justify-content: center; gap: 1.25rem; margin-top: 0.875rem; }
+    .shutter { width: 68px; height: 68px; border-radius: 50%; border: 4px solid var(--button-bg); background: var(--card-bg); position: relative; flex: none; padding: 0; }
+    .shutter::after { content: ""; position: absolute; inset: 6px; border-radius: 50%; background: var(--button-bg); transition: transform 90ms ease; }
+    .shutter:active::after { transform: scale(0.85); }
+    .shutter:hover { background: var(--card-bg); }
+    .shutter[disabled] { border-color: var(--button-disabled-bg); background: var(--card-bg); }
+    .shutter[disabled]::after { background: var(--button-disabled-bg); }
+    .side-btn { width: 52px; height: 52px; border-radius: 50%; font-size: 1.25rem; line-height: 1; flex: none; display: flex; align-items: center; justify-content: center; }
+    .side-btn.active { background: var(--button-bg); color: var(--button-text); border-color: var(--button-bg); }
+    .control-label { text-align: center; font-size: 0.6875rem; color: var(--subtitle-color); margin-top: 0.375rem; }
+
+    .out { font-size: 0.9375rem; line-height: 1.7; white-space: pre-wrap; word-break: break-word; max-height: 40vh; overflow-y: auto; }
+    .empty { color: var(--subtitle-color); font-style: italic; }
+    .legend { display: flex; flex-wrap: wrap; gap: 0.5rem 0.875rem; margin-top: 0.75rem; font-size: 0.6875rem; color: var(--subtitle-color); font-family: "SF Mono", Menlo, Consolas, monospace; }
+    .legend span { display: inline-flex; align-items: center; gap: 0.3rem; }
+    .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+
+    /* Saved captures */
+    .cap { display: flex; gap: 0.75rem; padding: 0.75rem 0; border-top: 1px solid var(--border-color); }
+    .cap:first-child { border-top: none; }
+    .cap img { width: 84px; height: 84px; object-fit: cover; border-radius: 0.375rem; border: 1px solid var(--border-color); flex: none; cursor: pointer; }
+    .cap .body { min-width: 0; flex: 1; }
+    .cap .txt { font-size: 0.8125rem; line-height: 1.45; max-height: 3.9em; overflow: hidden; word-break: break-word; }
+    .cap .when { font-size: 0.6875rem; color: var(--subtitle-color); font-family: "SF Mono", Menlo, Consolas, monospace; margin-bottom: 0.25rem; }
+    .cap .actions { display: flex; gap: 0.375rem; margin-top: 0.5rem; flex-wrap: wrap; }
+    .cap .actions button { font-size: 0.75rem; padding: 0.3rem 0.625rem; }
+    .cap .verdict { font-size: 0.75rem; margin-top: 0.375rem; font-family: "SF Mono", Menlo, Consolas, monospace; white-space: pre-wrap; }
+    input[type="file"] { display: none; }
+    .linklike { background: none; border: none; color: var(--link-color); font-size: 0.8125rem; padding: 0; cursor: pointer; }
+    .linklike:hover { background: none; text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Live OCR</h1>
+    <nav>
+      <a href="../index.html">Inference</a>
+      <a href="../read/index.html">Read</a>
+      <a href="../voice/index.html">Voice</a>
+      <a href="../realtime/index.html">Realtime</a>
+      <a href="../redact/index.html">Redact</a>
+      <a href="#" aria-current="page">OCR</a>
+    </nav>
+  </header>
+
+  <div class="wrap">
+    <div class="card">
+      <p class="subtitle">Point your phone at any document. Frames stream to <b>dots.ocr</b> (1.7B layout
+      model) at <code>/v1/ocr</code> on this stack &mdash; boxes and text render live. The shutter saves the
+      exact uploaded frame plus the exact model response to this browser (IndexedDB), so any run can be
+      downloaded later as a single bundle and re-verified against the server.</p>
+
+      <div class="stage" id="stage">
+        <video id="video" autoplay playsinline muted></video>
+        <img id="still" class="still" hidden />
+        <canvas id="overlay" class="overlay"></canvas>
+        <div class="status-pill" id="pill" hidden></div>
+        <div class="idle-hint" id="idleHint">
+          <div>
+            <button id="startBtn">Start camera</button>
+            <div style="margin-top:0.75rem"><button class="linklike" id="pickBtn">or pick a photo</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls" id="controls" hidden>
+        <div>
+          <button class="side-btn ghost" id="liveBtn" title="Toggle continuous scanning">&#9655;</button>
+          <div class="control-label" id="liveLabel">live</div>
+        </div>
+        <div>
+          <button class="shutter" id="shutterBtn" title="Capture &amp; save"></button>
+          <div class="control-label">save</div>
+        </div>
+        <div>
+          <button class="side-btn ghost" id="flipBtn" title="Switch camera">&#8634;</button>
+          <div class="control-label">flip</div>
+        </div>
+        <div id="torchWrap" hidden>
+          <button class="side-btn ghost" id="torchBtn" title="Toggle torch">&#9728;</button>
+          <div class="control-label">torch</div>
+        </div>
+      </div>
+      <div class="err" id="camErr"></div>
+      <input type="file" id="filePick" accept="image/*" />
+    </div>
+
+    <div class="card">
+      <h2>Recognized text</h2>
+      <div class="out" id="out"><span class="empty">nothing scanned yet</span></div>
+      <div class="legend" id="legend"></div>
+      <div class="row">
+        <button class="ghost" id="copyBtn" disabled>Copy text</button>
+        <span class="meta" id="timing"></span>
+      </div>
+      <div class="err" id="ocrErr"></div>
+    </div>
+
+    <div class="card">
+      <h2>Saved captures</h2>
+      <p class="subtitle">Stored only in this browser. <b>Download</b> emits one self-contained
+      <code>.json</code> bundle (image as data-URL + request params + model response + timing).
+      <b>Verify</b> re-sends the stored image to the server now and compares the text with the stored run.</p>
+      <div class="row" style="margin-top:0">
+        <button class="linklike" id="importBtn">Import bundle&hellip;</button>
+        <span class="meta" id="capCount"></span>
+      </div>
+      <input type="file" id="importPick" accept="application/json,.json" />
+      <div id="capList"><div class="empty" style="font-size:0.8125rem">no saved captures</div></div>
+    </div>
+  </div>
+
+<script>
+'use strict';
+
+const OCR_URL = '/v1/ocr';
+const OCR_PARAMS = { backend: 'dots', mode: 'layout', format: 'layout-json' };
+const MAX_SIDE = 1280;      // dots vision-token count tracks page area; cap upload size
+const JPEG_Q = 0.85;
+const LIVE_GAP_MS = 350;    // pause between live requests (server serializes generative OCR)
+const BUSY_BACKOFF_MS = 1500;
+
+const CAT_COLORS = {
+  'Title':          '#2d6cdf',
+  'Section-header': '#0e8cab',
+  'Text':           '#0f8f6e',
+  'List-item':      '#8e44ad',
+  'Table':          '#d4880f',
+  'Formula':        '#d2447a',
+  'Caption':        '#c0392b',
+  'Footnote':       '#7a1f1f',
+  'Page-header':    '#6b7280',
+  'Page-footer':    '#6b7280',
+  'Picture':        '#4b5563',
+};
+
+document.documentElement.setAttribute('data-theme',
+  window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+
+const $ = id => document.getElementById(id);
+const video = $('video'), still = $('still'), overlay = $('overlay'), pill = $('pill');
+const camErr = $('camErr'), ocrErr = $('ocrErr'), timing = $('timing');
+const out = $('out'), legend = $('legend');
+
+let stream = null;
+let facing = 'environment';
+let torchOn = false;
+let liveOn = false;
+let inFlight = false;
+let lastFrame = null;   // { blob, width, height, response, latencyMs, at }
+let stillUrl = null;
+
+// ---------- camera ----------
+
+async function startCamera() {
+  stopCamera();
+  camErr.textContent = '';
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+      audio: false,
+    });
+  } catch (e) {
+    camErr.textContent = 'Camera unavailable (' + e.name + '). You can still pick a photo below.';
+    return;
+  }
+  showLive();
+  video.srcObject = stream;
+  $('idleHint').hidden = true;
+  $('controls').hidden = false;
+  const track = stream.getVideoTracks()[0];
+  const caps = track.getCapabilities ? track.getCapabilities() : {};
+  $('torchWrap').hidden = !caps.torch;
+  torchOn = false;
+  setLive(true);   // usability default: scanning starts as soon as the camera does
+}
+
+function stopCamera() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  setLive(false);
+}
+
+function showLive() {
+  still.hidden = true; video.hidden = false;
+  if (stillUrl) { URL.revokeObjectURL(stillUrl); stillUrl = null; }
+}
+
+function showStill(blob) {
+  if (stillUrl) URL.revokeObjectURL(stillUrl);
+  stillUrl = URL.createObjectURL(blob);
+  still.src = stillUrl;
+  still.hidden = false; video.hidden = true;
+}
+
+function setLive(on) {
+  liveOn = on && !!stream;
+  $('liveBtn').classList.toggle('active', liveOn);
+  $('liveBtn').innerHTML = liveOn ? '&#9646;&#9646;' : '&#9655;';
+  $('liveLabel').textContent = liveOn ? 'pause' : 'live';
+  if (liveOn) { showLive(); liveLoop(); } else { setPill(null); }
+}
+
+function setPill(text) {
+  pill.hidden = !text;
+  if (text) pill.textContent = text;
+}
+
+// ---------- capture + OCR ----------
+
+function grabFrame() {
+  if (!stream || !video.videoWidth) return Promise.resolve(null);
+  const scale = Math.min(1, MAX_SIDE / Math.max(video.videoWidth, video.videoHeight));
+  const w = Math.round(video.videoWidth * scale), h = Math.round(video.videoHeight * scale);
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  c.getContext('2d').drawImage(video, 0, 0, w, h);
+  return new Promise(res => c.toBlob(b => res(b && { blob: b, width: w, height: h }), 'image/jpeg', JPEG_Q));
+}
+
+function blobFromImage(img) {
+  const scale = Math.min(1, MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+  const w = Math.round(img.naturalWidth * scale), h = Math.round(img.naturalHeight * scale);
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  c.getContext('2d').drawImage(img, 0, 0, w, h);
+  return new Promise(res => c.toBlob(b => res(b && { blob: b, width: w, height: h }), 'image/jpeg', JPEG_Q));
+}
+
+async function ocr(blob) {
+  const fd = new FormData();
+  fd.append('file', blob, 'capture.jpg');
+  for (const [k, v] of Object.entries(OCR_PARAMS)) fd.append(k, v);
+  const t0 = performance.now();
+  const res = await fetch(OCR_URL, { method: 'POST', body: fd });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    const err = new Error(res.status + ' ' + res.statusText + (body ? ' — ' + body.slice(0, 300) : ''));
+    err.status = res.status;
+    throw err;
+  }
+  const data = await res.json();
+  return { data, latencyMs: Math.round(performance.now() - t0) };
+}
+
+function elementsText(data) {
+  return (data.elements || []).map(e => e.text).filter(Boolean).join('\n');
+}
+
+function drawOverlay(frame) {
+  overlay.width = frame.width; overlay.height = frame.height;
+  const ctx = overlay.getContext('2d');
+  ctx.clearRect(0, 0, overlay.width, overlay.height);
+  ctx.lineWidth = Math.max(2, frame.width / 480);
+  for (const e of (frame.response.elements || [])) {
+    if (!e.bbox) continue;
+    const [x0, y0, x1, y1] = e.bbox;
+    const color = CAT_COLORS[e.category] || '#888';
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color + '22';
+    ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+  }
+}
+
+function renderResult(frame) {
+  const text = elementsText(frame.response);
+  out.textContent = '';
+  if (text) { out.textContent = text; $('copyBtn').disabled = false; }
+  else { out.innerHTML = '<span class="empty">no text detected</span>'; $('copyBtn').disabled = true; }
+  const els = frame.response.elements || [];
+  timing.textContent = frame.latencyMs + ' ms · ' + els.length + ' element' + (els.length === 1 ? '' : 's')
+    + (frame.response.truncated ? ' · truncated' : '');
+  const cats = [...new Set(els.map(e => e.category).filter(Boolean))].sort();
+  legend.innerHTML = cats.map(c =>
+    '<span><span class="swatch" style="background:' + (CAT_COLORS[c] || '#999') + '"></span>' + c + '</span>').join('');
+  drawOverlay(frame);
+}
+
+async function scanOnce(grabbed) {
+  if (inFlight) return null;
+  inFlight = true;
+  ocrErr.textContent = '';
+  try {
+    const g = grabbed || await grabFrame();
+    if (!g) return null;
+    setPill('scanning…');
+    const { data, latencyMs } = await ocr(g.blob);
+    lastFrame = { blob: g.blob, width: g.width, height: g.height, response: data, latencyMs, at: Date.now() };
+    renderResult(lastFrame);
+    setPill(liveOn ? 'live · ' + latencyMs + ' ms' : null);
+    return lastFrame;
+  } catch (e) {
+    setPill(null);
+    if (e.status === 503) { ocrErr.textContent = 'Server busy, retrying…'; return { busy: true }; }
+    ocrErr.textContent = String(e.message || e);
+    return null;
+  } finally {
+    inFlight = false;
+  }
+}
+
+async function liveLoop() {
+  while (liveOn) {
+    if (document.hidden) { await sleep(500); continue; }
+    const r = await scanOnce();
+    if (!liveOn) break;
+    await sleep(r && r.busy ? BUSY_BACKOFF_MS : LIVE_GAP_MS);
+  }
+}
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ---------- IndexedDB store ----------
+
+let db = null;
+function openDb() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open('ocr-live', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('captures', { keyPath: 'id', autoIncrement: true });
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  });
+}
+const tx = mode => db.transaction('captures', mode).objectStore('captures');
+const idbReq = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+
+async function saveCapture(frame) {
+  const rec = {
+    at: frame.at,
+    endpoint: OCR_URL,
+    params: OCR_PARAMS,
+    latencyMs: frame.latencyMs,
+    width: frame.width,
+    height: frame.height,
+    image: frame.blob,
+    response: frame.response,
+  };
+  rec.id = await idbReq(tx('readwrite').add(rec));
+  return rec;
+}
+
+// ---------- saved captures UI ----------
+
+const capUrls = new Map();
+
+async function renderCaptures() {
+  const recs = await idbReq(tx('readonly').getAll());
+  recs.sort((a, b) => b.at - a.at);
+  $('capCount').textContent = recs.length ? recs.length + ' stored' : '';
+  const list = $('capList');
+  for (const u of capUrls.values()) URL.revokeObjectURL(u);
+  capUrls.clear();
+  if (!recs.length) {
+    list.innerHTML = '<div class="empty" style="font-size:0.8125rem">no saved captures</div>';
+    return;
+  }
+  list.innerHTML = '';
+  for (const rec of recs) {
+    const url = URL.createObjectURL(rec.image);
+    capUrls.set(rec.id, url);
+    const text = elementsText(rec.response) || '(no text)';
+    const div = document.createElement('div');
+    div.className = 'cap';
+    div.innerHTML =
+      '<img src="' + url + '" alt="capture" />' +
+      '<div class="body">' +
+        '<div class="when">' + new Date(rec.at).toLocaleString() + ' · ' + rec.latencyMs + ' ms · ' +
+          (rec.response.elements || []).length + ' els</div>' +
+        '<div class="txt"></div>' +
+        '<div class="actions">' +
+          '<button class="ghost" data-act="download">Download</button>' +
+          '<button class="ghost" data-act="verify">Verify</button>' +
+          '<button class="ghost" data-act="delete">Delete</button>' +
+        '</div>' +
+        '<div class="verdict"></div>' +
+      '</div>';
+    div.querySelector('.txt').textContent = text;
+    div.querySelector('img').addEventListener('click', () => {
+      setLive(false);
+      showStill(rec.image);
+      lastFrame = { blob: rec.image, width: rec.width, height: rec.height,
+                    response: rec.response, latencyMs: rec.latencyMs, at: rec.at };
+      renderResult(lastFrame);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+    div.querySelector('[data-act=download]').addEventListener('click', () => downloadBundle(rec));
+    div.querySelector('[data-act=verify]').addEventListener('click',
+      ev => verifyCapture(rec, ev.target, div.querySelector('.verdict')));
+    div.querySelector('[data-act=delete]').addEventListener('click', async () => {
+      await idbReq(tx('readwrite').delete(rec.id));
+      renderCaptures();
+    });
+    list.appendChild(div);
+  }
+}
+
+// ---------- download / verify / import ----------
+
+const blobToDataUrl = blob => new Promise((res, rej) => {
+  const r = new FileReader();
+  r.onload = () => res(r.result);
+  r.onerror = () => rej(r.error);
+  r.readAsDataURL(blob);
+});
+
+async function downloadBundle(rec) {
+  const bundle = {
+    kind: 'ocr-capture-bundle',
+    version: 1,
+    capturedAt: new Date(rec.at).toISOString(),
+    endpoint: rec.endpoint,
+    params: rec.params,
+    latencyMs: rec.latencyMs,
+    image: { mime: rec.image.type, width: rec.width, height: rec.height,
+             dataUrl: await blobToDataUrl(rec.image) },
+    response: rec.response,
+  };
+  const url = URL.createObjectURL(new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'ocr-capture-' + new Date(rec.at).toISOString().replace(/[:.]/g, '-') + '.json';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+async function verifyCapture(rec, btn, verdictEl) {
+  btn.disabled = true; btn.textContent = 'Verifying…';
+  verdictEl.textContent = ''; verdictEl.className = 'verdict';
+  try {
+    const { data, latencyMs } = await ocr(rec.image);
+    const oldText = elementsText(rec.response), newText = elementsText(data);
+    if (oldText === newText) {
+      verdictEl.classList.add('ok');
+      verdictEl.textContent = '✓ verified: re-run text identical (' + latencyMs + ' ms)';
+    } else {
+      let i = 0;
+      while (i < oldText.length && i < newText.length && oldText[i] === newText[i]) i++;
+      verdictEl.textContent = '✗ differs: stored ' + oldText.length + ' chars, re-run ' + newText.length +
+        ' chars, first divergence at ' + i + ' (' + latencyMs + ' ms)\nstored  …' +
+        oldText.slice(Math.max(0, i - 20), i + 20) + '\nre-run  …' + newText.slice(Math.max(0, i - 20), i + 20);
+    }
+  } catch (e) {
+    verdictEl.textContent = 'verify failed: ' + (e.message || e);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Verify';
+  }
+}
+
+async function importBundle(file) {
+  const bundle = JSON.parse(await file.text());
+  if (bundle.kind !== 'ocr-capture-bundle') throw new Error('not an OCR capture bundle');
+  const blob = await (await fetch(bundle.image.dataUrl)).blob();
+  await idbReq(tx('readwrite').add({
+    at: Date.parse(bundle.capturedAt) || Date.now(),
+    endpoint: bundle.endpoint,
+    params: bundle.params,
+    latencyMs: bundle.latencyMs,
+    width: bundle.image.width,
+    height: bundle.image.height,
+    image: blob,
+    response: bundle.response,
+  }));
+  renderCaptures();
+}
+
+// ---------- wiring ----------
+
+$('startBtn').addEventListener('click', startCamera);
+$('flipBtn').addEventListener('click', () => { facing = facing === 'environment' ? 'user' : 'environment'; startCamera(); });
+$('liveBtn').addEventListener('click', () => setLive(!liveOn));
+$('torchBtn').addEventListener('click', async () => {
+  const track = stream && stream.getVideoTracks()[0];
+  if (!track) return;
+  torchOn = !torchOn;
+  try { await track.applyConstraints({ advanced: [{ torch: torchOn }] }); }
+  catch (e) { camErr.textContent = 'torch: ' + e; torchOn = false; }
+  $('torchBtn').classList.toggle('active', torchOn);
+});
+
+$('shutterBtn').addEventListener('click', async () => {
+  const btn = $('shutterBtn');
+  btn.disabled = true;
+  try {
+    // Reuse the frame on screen (paused / photo / a live result < 3 s old); otherwise grab+scan now.
+    let frame = (lastFrame && (!liveOn || Date.now() - lastFrame.at < 3000)) ? lastFrame : null;
+    if (!frame) {
+      while (inFlight) await sleep(50);
+      frame = await scanOnce();
+      if (frame && frame.busy) frame = null;
+    }
+    if (frame) { await saveCapture(frame); renderCaptures(); }
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$('copyBtn').addEventListener('click', () => {
+  navigator.clipboard.writeText(out.textContent).then(() => {
+    $('copyBtn').textContent = 'Copied';
+    setTimeout(() => { $('copyBtn').textContent = 'Copy text'; }, 1200);
+  });
+});
+
+$('pickBtn').addEventListener('click', () => $('filePick').click());
+$('filePick').addEventListener('change', async () => {
+  const f = $('filePick').files[0];
+  if (!f) return;
+  setLive(false);
+  const img = new Image();
+  img.src = URL.createObjectURL(f);
+  await img.decode();
+  const g = await blobFromImage(img);
+  URL.revokeObjectURL(img.src);
+  if (!g) return;
+  $('idleHint').hidden = true;
+  $('controls').hidden = false;
+  showStill(g.blob);
+  await scanOnce(g);
+  $('filePick').value = '';
+});
+
+$('importBtn').addEventListener('click', () => $('importPick').click());
+$('importPick').addEventListener('change', async () => {
+  const f = $('importPick').files[0];
+  if (!f) return;
+  try { await importBundle(f); }
+  catch (e) { ocrErr.textContent = 'import failed: ' + (e.message || e); }
+  $('importPick').value = '';
+});
+
+document.addEventListener('visibilitychange', () => {
+  // Drop the torch when backgrounded; the live loop already idles on hidden.
+  if (document.hidden && torchOn) $('torchBtn').click();
+});
+
+openDb().then(d => { db = d; renderCaptures(); });
+</script>
+</body>
+</html>

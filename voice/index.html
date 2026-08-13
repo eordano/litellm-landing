@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Voice Recorder</title>
+    <style>
+      :root {
+        --bg-color: #f0f0f0;
+        --text-color: #111827;
+        --header-bg: #ffffff;
+        --card-bg: #ffffff;
+        --border-color: #e5e7eb;
+        --input-bg: #f9fafb;
+        --input-border: #d1d5db;
+        --input-focus-border: #3b82f6;
+        --button-bg: #1c71d8;
+        --button-text: #ffffff;
+        --button-hover-bg: #1a63bA;
+        --button-disabled-bg: #9ca3af;
+        --pre-bg: #f3f4f6;
+        --link-color: #1c71d8;
+        --subtitle-color: #6b7280;
+
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+        color-scheme: light;
+      }
+      html[data-theme='dark'] {
+        --bg-color: #111827;
+        --text-color: #f9fafb;
+        --header-bg: #1f2937;
+        --card-bg: #1f2937;
+        --border-color: #374151;
+        --input-bg: #374151;
+        --input-border: #4b5563;
+        --input-focus-border: #60a5fa;
+        --button-bg: #3b82f6;
+        --button-hover-bg: #2563eb;
+        --button-disabled-bg: #4b5563;
+        --pre-bg: #1e2c40;
+        --link-color: #60a5fa;
+        --subtitle-color: #9ca3af;
+        color-scheme: dark;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        font-size: 16px;
+        line-height: 1.6;
+        transition: background-color 0.2s, color 0.2s;
+      }
+      header {
+        background-color: var(--header-bg);
+        border-bottom: 1px solid var(--border-color);
+        padding: 0 2rem;
+        height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+      header h1 { font-size: 1.25rem; font-weight: 600; }
+      header nav { display: flex; gap: 1rem; align-items: center; }
+      header nav a {
+        color: var(--link-color);
+        text-decoration: none;
+        font-size: 0.875rem;
+        font-weight: 500;
+      }
+      header nav a:hover { text-decoration: underline; }
+      #headerStatus {
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: var(--subtitle-color);
+        background: var(--pre-bg);
+        padding: 0.25rem 0.75rem;
+        border-radius: 1rem;
+        white-space: nowrap;
+        transition: all 0.2s;
+      }
+      #headerStatus.recording { color: #ef4444; }
+      #headerStatus.transcribing { color: var(--link-color); }
+      #headerStatus:empty { display: none; }
+      main { padding: 2rem; max-width: 1400px; margin: 0 auto; }
+
+      /* Controls bar */
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        margin-bottom: 1.5rem;
+      }
+      .controls select {
+        padding: 0.5rem 0.75rem;
+        border-radius: 0.375rem;
+        border: 1px solid var(--input-border);
+        background: var(--input-bg);
+        color: var(--text-color);
+        font-size: 0.875rem;
+        min-width: 180px;
+      }
+      .controls select:focus { outline: none; border-color: var(--input-focus-border); }
+      .btn {
+        padding: 0.5rem 0.875rem;
+        border: none;
+        border-radius: 0.375rem;
+        background-color: var(--button-bg);
+        color: var(--button-text);
+        font-weight: 600;
+        font-size: 0.8rem;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+      }
+      .btn:hover { background-color: var(--button-hover-bg); }
+      .btn:disabled { background-color: var(--button-disabled-bg); cursor: not-allowed; }
+      .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.7rem;
+        font-weight: 500;
+        gap: 4px;
+        opacity: 0.7;
+        background-color: var(--input-bg);
+        color: var(--text-color);
+        border: 1px solid var(--border-color);
+      }
+      .btn-sm:hover { opacity: 1; background-color: var(--pre-bg); }
+      .btn-sm svg { width: 12px; height: 12px; }
+      .btn-danger { color: #ef4444; }
+      .btn-danger:hover { background-color: #fef2f2; }
+      html[data-theme='dark'] .btn-danger:hover { background-color: #451a1a; }
+
+      /* Transcript status bar */
+      #transcript {
+        text-align: center;
+        background-color: var(--pre-bg);
+        padding: 10px;
+        border-radius: 0.375rem;
+        margin-bottom: 1.5rem;
+        display: none;
+      }
+      #transcript.visible { display: block; }
+
+      /* Table */
+      table { border-collapse: collapse; width: 100%; }
+      th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border-color); }
+      th { background-color: var(--pre-bg); color: var(--link-color); font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+      th.time, td.time { white-space: nowrap; }
+      th.audio, td.audio { white-space: nowrap; }
+      td.audio .action-btns { display: flex; gap: 0.375rem; margin-top: 0.375rem; }
+      a { text-decoration: none; color: var(--link-color); }
+      .copied { color: var(--link-color); margin-left: 5px; }
+      .error { color: #ef4444; text-align: center; margin: 10px 0; }
+
+      /* Sortable header */
+      .sortable {
+        cursor: pointer;
+        user-select: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .sortable:hover { opacity: 0.8; }
+      .chevron { font-size: 0.7rem; transition: transform 0.2s; }
+
+      /* Search in header */
+      .th-transcript {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      #searchInput {
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
+        border: 1px solid var(--input-border);
+        background: var(--input-bg);
+        color: var(--text-color);
+        font-size: 0.75rem;
+        width: 160px;
+        font-weight: 400;
+      }
+      #searchInput:focus { outline: none; border-color: var(--input-focus-border); }
+      #searchInput::placeholder { color: var(--subtitle-color); }
+
+      @media (max-width: 600px) {
+        .controls { flex-direction: column; align-items: stretch; }
+        .controls select { min-width: unset; width: 100%; }
+        #searchInput { width: 100px; }
+        header { padding: 0 1rem; }
+        main { padding: 1rem; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Voice Recorder</h1>
+      <span id="headerStatus"></span>
+      <nav>
+        <a href="../index.html">Inference</a>
+        <a href="../read/index.html">Read</a>
+        <a href="../realtime/index.html">Realtime</a>
+        <a href="../ocr/index.html">OCR</a>
+      </nav>
+    </header>
+    <main>
+      <div class="controls">
+        <select id="micSelect"><option value="">Default Microphone</option></select>
+        <button class="btn" id="recordBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+          Record
+        </button>
+        <button class="btn" id="uploadBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          Upload
+        </button>
+        <input type="file" id="fileInput" accept="audio/*" hidden />
+      </div>
+      <div id="transcript"></div>
+      <div id="errors"></div>
+      <table>
+        <thead>
+          <tr>
+            <th class="time"><span class="sortable" id="sortTime">Time <span class="chevron" id="sortChevron">&#9660;</span></span></th>
+            <th><div class="th-transcript"><span>Transcript</span><input type="text" id="searchInput" placeholder="Search..." /></div></th>
+            <th class="audio">Audio</th>
+          </tr>
+        </thead>
+        <tbody id="recordings"></tbody>
+      </table>
+    </main>
+    <script type="module">
+      // Theme
+      document.documentElement.dataset.theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+
+      // DOM elements
+      const $ = id => document.getElementById(id);
+      const recordBtn = $('recordBtn'), uploadBtn = $('uploadBtn'), fileInput = $('fileInput');
+      const transcript = $('transcript'), errors = $('errors'), tbody = $('recordings');
+      const headerStatus = $('headerStatus');
+      const searchInput = $('searchInput');
+      const sortTimeBtn = $('sortTime'), sortChevron = $('sortChevron');
+
+      // Microphone selection
+      const micSelect = $('micSelect');
+      const MIC_STORAGE_KEY = 'voiceRecorder_selectedMic';
+
+      async function populateMics() {
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const mics = devices.filter(d => d.kind === 'audioinput');
+          if (mics.length && mics[0].label) {
+            const saved = localStorage.getItem(MIC_STORAGE_KEY);
+            micSelect.innerHTML = '<option value="">Default Microphone</option>';
+            mics.forEach(d => {
+              const opt = document.createElement('option');
+              opt.value = d.deviceId;
+              opt.textContent = d.label || `Microphone ${micSelect.options.length}`;
+              micSelect.appendChild(opt);
+            });
+            if (saved) micSelect.value = saved;
+          }
+        } catch (e) { console.warn('Could not enumerate microphones:', e); }
+      }
+      async function populateMicsWithPermission() {
+        try {
+          await navigator.mediaDevices.getUserMedia({ audio: true }).then(s => s.getTracks().forEach(t => t.stop()));
+          await populateMics();
+        } catch (e) { console.warn('Could not enumerate microphones:', e); }
+      }
+      populateMics();
+      micSelect.addEventListener('focus', populateMicsWithPermission, { once: true });
+      micSelect.addEventListener('change', () => localStorage.setItem(MIC_STORAGE_KEY, micSelect.value));
+      navigator.mediaDevices.addEventListener('devicechange', populateMics);
+
+      // Sort state
+      let sortAsc = false; // false = newest first (descending)
+
+      // All loaded recordings for search/sort
+      let allRecordings = [];
+
+      // State
+      let isRecording = false, mediaRecorder = null, audioChunks = [], recordingStart = 0;
+      let currentRecording = null, transcriptionStart = 0, progressInterval = null;
+      let activeStream = null;
+
+      // Icons
+      const micIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`;
+      const stopIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>`;
+
+      // IndexedDB
+      const dbPromise = new Promise((resolve, reject) => {
+        const req = indexedDB.open('voiceRecorderDB', 1);
+        req.onupgradeneeded = e => e.target.result.createObjectStore('recordings', { keyPath: 'id' });
+        req.onsuccess = e => resolve(e.target.result);
+        req.onerror = e => reject(e.target.error);
+      });
+
+      const db = {
+        async save(recording) {
+          const db = await dbPromise;
+          const tx = db.transaction('recordings', 'readwrite');
+          tx.objectStore('recordings').put({ ...recording, audioBlob: null });
+        },
+        async getAll() {
+          const db = await dbPromise;
+          return new Promise(resolve => {
+            const req = db.transaction('recordings').objectStore('recordings').getAll();
+            req.onsuccess = () => resolve(req.result);
+          });
+        },
+        async delete(id) {
+          const db = await dbPromise;
+          db.transaction('recordings', 'readwrite').objectStore('recordings').delete(id);
+        }
+      };
+
+      // Utilities
+      const humanTime = ts => {
+        const diff = (Date.now() - ts) / 1000;
+        if (diff < 60) return `${Math.floor(diff)}s ago`;
+        if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+        if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+        const d = new Date(ts);
+        return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      };
+
+      const b64toBlob = (b64, type) => {
+        const bytes = atob(b64), arr = new Uint8Array(bytes.length);
+        for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+        return new Blob([arr], { type });
+      };
+
+      const showError = msg => {
+        const el = document.createElement('p');
+        el.className = 'error';
+        el.textContent = msg;
+        errors.appendChild(el);
+        setTimeout(() => el.remove(), 3000);
+      };
+
+      const showTranscript = (msg, visible = true) => {
+        transcript.innerHTML = msg;
+        transcript.classList.toggle('visible', visible);
+      };
+
+      const setStatus = (text, cls) => {
+        headerStatus.textContent = text;
+        headerStatus.className = cls || '';
+      };
+
+      const startProgress = (label, cls) => {
+        stopProgress();
+        const start = Date.now();
+        progressInterval = setInterval(() => {
+          const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+          setStatus(`${label} ${elapsed}s`, cls);
+          showTranscript(`${label} ${elapsed}s`);
+        }, 100);
+      };
+
+      const stopProgress = () => {
+        if (progressInterval) { clearInterval(progressInterval); progressInterval = null; }
+      };
+
+      // Fuzzy search -- each query word is fuzzy-matched independently
+      const fuzzyWord = (word, text) => {
+        if (text.includes(word)) return true;
+        let wi = 0;
+        for (let i = 0; i < text.length && wi < word.length; i++) {
+          if (text[i] === word[wi]) wi++;
+        }
+        return wi === word.length;
+      };
+      const fuzzyMatch = (query, text) => {
+        if (!query) return true;
+        const t = text.toLowerCase();
+        return query.toLowerCase().split(/\s+/).every(w => w && fuzzyWord(w, t));
+      };
+
+      // Render table from allRecordings
+      const renderTable = () => {
+        const query = searchInput.value.trim();
+        const filtered = allRecordings.filter(r => {
+          if (!query) return true;
+          return fuzzyMatch(query, r.transcription || '');
+        });
+        filtered.sort((a, b) => sortAsc ? a.id - b.id : b.id - a.id);
+        tbody.innerHTML = '';
+        filtered.forEach(rec => {
+          const row = document.createElement('tr');
+          row.dataset.id = rec.id;
+          row.innerHTML = getRowHTML(rec);
+          bindRowEvents(row, rec);
+          tbody.appendChild(row);
+        });
+      };
+
+      // Transcription API
+      const transcribe = async recording => {
+        transcriptionStart = Date.now();
+        startProgress('Transcribing...', 'transcribing');
+        try {
+          const formData = new FormData();
+          formData.append('file', recording.audioBlob, 'recording.wav');
+          formData.append('model', 'stt-default');
+          const res = await fetch('/v1/audio/transcriptions', { method: 'POST', body: formData });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          stopProgress();
+          recording.transcription = data.text;
+          recording.transcriptionTime = (Date.now() - transcriptionStart) / 1000;
+          await db.save(recording);
+          renderTable();
+          showLastRecording(recording);
+        } catch (e) {
+          stopProgress();
+          showError('Transcription failed: ' + e.message);
+          recording.transcription = 'Transcription failed';
+          renderTable();
+          showLastRecording(recording);
+        }
+      };
+
+      // Recording
+      const toggleRecording = async () => {
+        if (isRecording) {
+          mediaRecorder?.stop();
+        } else {
+          try {
+            const audioConstraints = micSelect.value ? { deviceId: { exact: micSelect.value } } : true;
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+            activeStream = stream;
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+            recordingStart = Date.now();
+            mediaRecorder.ondataavailable = e => e.data.size > 0 && audioChunks.push(e.data);
+            mediaRecorder.onstop = onRecordingStop;
+            mediaRecorder.start();
+            isRecording = true;
+            recordBtn.innerHTML = `${stopIcon} Stop`;
+            startProgress('Recording...', 'recording');
+          } catch (e) {
+            showError('Microphone access denied: ' + e.message);
+          }
+        }
+      };
+
+      const onRecordingStop = async () => {
+        isRecording = false;
+        recordBtn.innerHTML = `${micIcon} Record`;
+        stopProgress();
+        setStatus('');
+        if (activeStream) { activeStream.getTracks().forEach(t => t.stop()); activeStream = null; }
+        const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+        const recording = await createRecording(audioBlob, Date.now() - recordingStart);
+        await processRecording(recording);
+      };
+
+      const createRecording = async (audioBlob, duration) => {
+        const base64 = await new Promise(resolve => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result.split(',')[1]);
+          reader.readAsDataURL(audioBlob);
+        });
+        return {
+          id: Date.now(),
+          timestamp: Date.now(),
+          audioBlob,
+          audioBase64: base64,
+          audioUrl: URL.createObjectURL(audioBlob),
+          duration,
+          mimeType: audioBlob.type,
+          transcription: null
+        };
+      };
+
+      const processRecording = async recording => {
+        currentRecording = recording;
+        allRecordings.push(recording);
+        await db.save(recording);
+        renderTable();
+        showLastRecording(recording);
+        await transcribe(recording);
+      };
+
+      // File upload
+      const handleUpload = async e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const recording = await createRecording(file, 0);
+        await processRecording(recording);
+        fileInput.value = '';
+      };
+
+      // Table rendering
+      const getRowHTML = rec => {
+        const audioUrl = rec.audioUrl || URL.createObjectURL(b64toBlob(rec.audioBase64, rec.mimeType || 'audio/webm'));
+        const hasTranscript = rec.transcription && !['Transcription failed', 'No transcription available'].includes(rec.transcription);
+        return `
+          <td class="time">${hasTranscript ? `<a href="#" class="copy">${humanTime(rec.timestamp)}</a>` : humanTime(rec.timestamp)}</td>
+          <td>${rec.transcription || 'Transcribing...'}${!hasTranscript && rec.transcription ? ' <a href="#" class="retry">Retry</a>' : ''}</td>
+          <td class="audio">
+            <audio controls style="height:32px"><source src="${audioUrl}" type="${rec.mimeType || 'audio/webm'}"></audio>
+            <div class="action-btns">
+              <a href="${audioUrl}" download="recording_${rec.id}.webm" class="btn btn-sm">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Save
+              </a>
+              <button class="btn btn-sm retry" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                Retry
+              </button>
+              <button class="btn btn-sm btn-danger delete" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                Delete
+              </button>
+            </div>
+          </td>`;
+      };
+
+      const retranscribe = async recording => {
+        recording.audioBlob = recording.audioBlob || b64toBlob(recording.audioBase64, recording.mimeType || 'audio/webm');
+        await transcribe(recording);
+      };
+
+      const bindRowEvents = (row, recording) => {
+        row.querySelector('.copy')?.addEventListener('click', e => { e.preventDefault(); copyText(recording.transcription, e.target); });
+        row.querySelectorAll('.retry').forEach(el => el.addEventListener('click', async e => {
+          e.preventDefault();
+          await retranscribe(recording);
+        }));
+        row.querySelector('.delete')?.addEventListener('click', async e => {
+          e.preventDefault();
+          if (!confirm('Are you sure you want to delete this recording?')) return;
+          await db.delete(recording.id);
+          allRecordings = allRecordings.filter(r => r.id !== recording.id);
+          renderTable();
+        });
+      };
+
+      const copyText = (text, el) => {
+        navigator.clipboard.writeText(text).then(() => {
+          const msg = document.createElement('span');
+          msg.className = 'copied';
+          msg.textContent = 'Copied!';
+          el.after(msg);
+          setTimeout(() => msg.remove(), 1500);
+        }).catch(e => showError('Copy failed: ' + e.message));
+      };
+
+      const showLastRecording = rec => {
+        currentRecording = rec;
+        let html = '';
+        if (rec.duration) html += `Duration: ${(rec.duration / 1000).toFixed(1)}s<br>`;
+        if (rec.transcriptionTime) html += `Server: ${rec.transcriptionTime.toFixed(1)}s<br>`;
+        if (rec.transcription) {
+          html += rec.transcription;
+          if (rec.transcription !== 'Transcription failed') {
+            html += ` <a href="#" id="copyLast">Copy</a>`;
+          } else {
+            html += ` <a href="#" id="retryLast">Retry</a>`;
+          }
+        }
+        showTranscript(html);
+        setStatus(rec.transcription && rec.transcription !== 'Transcription failed'
+          ? `Done ${rec.transcriptionTime ? rec.transcriptionTime.toFixed(1) + 's' : ''}`
+          : '');
+        $('copyLast')?.addEventListener('click', e => { e.preventDefault(); copyText(rec.transcription, e.target); });
+        $('retryLast')?.addEventListener('click', async e => {
+          e.preventDefault();
+          await retranscribe(rec);
+        });
+      };
+
+      // Sort toggle
+      sortTimeBtn.addEventListener('click', () => {
+        sortAsc = !sortAsc;
+        sortChevron.innerHTML = sortAsc ? '&#9650;' : '&#9660;';
+        renderTable();
+      });
+
+      // Search
+      let searchTimeout;
+      searchInput.addEventListener('input', () => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(renderTable, 150);
+      });
+
+      // Init
+      recordBtn.addEventListener('click', toggleRecording);
+      uploadBtn.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', handleUpload);
+      document.addEventListener('keydown', e => {
+        if (e.code === 'Space' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) {
+          e.preventDefault();
+          toggleRecording();
+        }
+      });
+
+      // Load saved recordings
+      db.getAll().then(recordings => {
+        allRecordings = recordings.map(rec => {
+          rec.audioUrl = rec.audioBase64 ? URL.createObjectURL(b64toBlob(rec.audioBase64, rec.mimeType || 'audio/webm')) : null;
+          return rec;
+        });
+        renderTable();
+      });
+
+      navigator.storage.persist();
+    </script>
+  </body>
+</html>

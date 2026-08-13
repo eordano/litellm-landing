@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PII Redact</title>
+  <style>
+    :root {
+      --bg-color: #f0f0f0;
+      --text-color: #111827;
+      --header-bg: #ffffff;
+      --card-bg: #ffffff;
+      --border-color: #e5e7eb;
+      --input-bg: #f9fafb;
+      --input-border: #d1d5db;
+      --input-focus-border: #3b82f6;
+      --button-bg: #1c71d8;
+      --button-text: #ffffff;
+      --button-hover-bg: #1a63bA;
+      --button-disabled-bg: #9ca3af;
+      --pre-bg: #f3f4f6;
+      --link-color: #1c71d8;
+      --subtitle-color: #6b7280;
+      --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color-scheme: light;
+    }
+    html[data-theme='dark'] {
+      --bg-color: #111827;
+      --text-color: #f9fafb;
+      --header-bg: #1f2937;
+      --card-bg: #1f2937;
+      --border-color: #374151;
+      --input-bg: #374151;
+      --input-border: #4b5563;
+      --input-focus-border: #60a5fa;
+      --button-bg: #3b82f6;
+      --button-hover-bg: #2563eb;
+      --button-disabled-bg: #4b5563;
+      --pre-bg: #1e2c40;
+      --link-color: #60a5fa;
+      --subtitle-color: #9ca3af;
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg-color); color: var(--text-color); min-height: 100vh; }
+    header { background: var(--header-bg); border-bottom: 1px solid var(--border-color); padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; }
+    header h1 { font-size: 1.25rem; font-weight: 600; }
+    header nav { display: flex; gap: 1rem; }
+    header nav a { color: var(--link-color); text-decoration: none; font-size: 0.875rem; }
+    header nav a:hover { text-decoration: underline; }
+    .wrap { max-width: 820px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    .card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 0.5rem; padding: 1.5rem; margin-bottom: 1rem; box-shadow: var(--shadow); }
+    .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; }
+    textarea { width: 100%; min-height: 120px; padding: 0.75rem; background: var(--input-bg); color: var(--text-color); border: 1px solid var(--input-border); border-radius: 0.375rem; font-family: inherit; font-size: 0.9375rem; line-height: 1.5; resize: vertical; }
+    textarea:focus { outline: 2px solid var(--input-focus-border); outline-offset: -1px; border-color: transparent; }
+    .row { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.75rem; }
+    button { font: inherit; font-size: 0.875rem; font-weight: 500; padding: 0.5rem 1rem; border-radius: 0.375rem; background: var(--button-bg); color: var(--button-text); border: none; cursor: pointer; }
+    button:hover { background: var(--button-hover-bg); }
+    button[disabled] { background: var(--button-disabled-bg); cursor: progress; }
+    .meta { font-size: 0.75rem; color: var(--subtitle-color); margin-left: auto; font-family: "SF Mono", Menlo, Consolas, monospace; }
+    .out { font-size: 0.9375rem; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+    mark { --c: currentColor; background: var(--c); color: var(--c); padding: 1px 4px; border-radius: 3px; cursor: pointer; transition: background 140ms ease, color 140ms ease; user-select: none; }
+    mark:hover, mark:focus, mark.revealed { background: color-mix(in oklab, var(--c), transparent 88%); color: var(--text-color); user-select: text; outline: none; }
+    .legend { display: flex; flex-wrap: wrap; gap: 0.625rem 0.875rem; margin-top: 0.75rem; font-size: 0.75rem; color: var(--subtitle-color); }
+    .legend span { display: inline-flex; align-items: center; gap: 0.3rem; font-family: "SF Mono", Menlo, Consolas, monospace; }
+    .swatch { display: inline-block; width: 10px; height: 3px; border-radius: 1px; }
+    pre.json { margin: 0.5rem 0 0; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 0.75rem; background: var(--pre-bg); padding: 0.75rem; border-radius: 0.375rem; overflow-x: auto; color: var(--subtitle-color); }
+    .empty { color: var(--subtitle-color); font-style: italic; }
+    .err { color: #c0392b; font-size: 0.8125rem; margin-top: 0.5rem; }
+    .image-section { margin-top: 1rem; }
+    .image-section input[type="file"] { font-size: 0.875rem; }
+    .image-preview { margin-top: 0.5rem; max-width: 100%; border-radius: 0.375rem; border: 1px solid var(--border-color); }
+    .tab-row { display: flex; gap: 0; margin-bottom: 1rem; }
+    .tab-row button { border-radius: 0; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-color); flex: 1; }
+    .tab-row button.active { background: var(--button-bg); color: var(--button-text); }
+    .tab-row button:first-child { border-radius: 0.375rem 0 0 0.375rem; }
+    .tab-row button:last-child { border-radius: 0 0.375rem 0.375rem 0; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>PII Redact</h1>
+    <nav>
+      <a href="../index.html">Inference</a>
+      <a href="../read/index.html">Read</a>
+      <a href="../voice/index.html">Voice</a>
+      <a href="../realtime/index.html">Realtime</a>
+      <a href="../ocr/index.html">OCR</a>
+    </nav>
+  </header>
+
+  <div class="wrap">
+    <div class="tab-row">
+      <button class="active" id="tabText">Text</button>
+      <button id="tabImage">Image</button>
+    </div>
+
+    <div id="textPanel">
+      <div class="card">
+        <h2>Detect PII in Text</h2>
+        <textarea id="input" placeholder="Paste text containing PII..."></textarea>
+        <div class="row">
+          <button id="go">Classify</button>
+          <span class="meta" id="timing"></span>
+        </div>
+        <div class="err" id="err"></div>
+      </div>
+
+      <div class="card">
+        <h2>Highlighted</h2>
+        <div class="out" id="out"><span class="empty">no input yet</span></div>
+        <div class="legend" id="legend"></div>
+      </div>
+
+      <div class="card">
+        <h2>Raw JSON</h2>
+        <pre class="json" id="json">[]</pre>
+      </div>
+    </div>
+
+    <div id="imagePanel" class="hidden">
+      <div class="card">
+        <h2>Redact PII from Image</h2>
+        <input type="file" id="imageFile" accept="image/*" />
+        <div class="row">
+          <button id="analyzeBtn" disabled>Analyze</button>
+          <button id="renderBtn" disabled>Render Redacted</button>
+          <span class="meta" id="imgTiming"></span>
+        </div>
+        <div class="err" id="imgErr"></div>
+      </div>
+
+      <div class="card">
+        <h2>Result</h2>
+        <img id="imgPreview" class="image-preview hidden" />
+        <pre class="json" id="imgJson">upload an image to start</pre>
+      </div>
+    </div>
+  </div>
+
+<script>
+const COLORS = {
+  private_person:  "#2d6cdf",
+  private_email:   "#0f8f6e",
+  private_phone:   "#d4880f",
+  private_address: "#c0392b",
+  private_date:    "#8e44ad",
+  private_url:     "#0e8cab",
+  account_number:  "#d2447a",
+  secret:          "#7a1f1f",
+};
+
+const sample =
+  "Hi Sarah, my email is alex.morales@example.com and my number is +1 (415) 555-0142. " +
+  "Pickup at 1212 Mission St, San Francisco on March 7th. " +
+  "Card on file ends in 4242. The reset token is sk-live-9f1c2d3a4b5e6789a0b1c2d3.";
+
+const theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+document.documentElement.setAttribute('data-theme', theme);
+
+const inp = document.getElementById('input');
+const out = document.getElementById('out');
+const jbox = document.getElementById('json');
+const btn = document.getElementById('go');
+const tim = document.getElementById('timing');
+const err = document.getElementById('err');
+const legend = document.getElementById('legend');
+
+inp.value = sample;
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function render(text, spans) {
+  if (!spans.length) { out.innerHTML = '<span class="empty">no PII detected</span>'; return; }
+  spans = [...spans].sort((a,b) => a.start - b.start);
+  let html = '', cursor = 0;
+  for (const s of spans) {
+    if (s.start > cursor) html += escapeHtml(text.slice(cursor, s.start));
+    const color = COLORS[s.label] || '#888';
+    html += `<mark style="--c:${color}" title="${s.label}" tabindex="0">${escapeHtml(text.slice(s.start, s.endExclusive))}</mark>`;
+    cursor = s.endExclusive;
+  }
+  if (cursor < text.length) html += escapeHtml(text.slice(cursor));
+  out.innerHTML = html;
+  for (const m of out.querySelectorAll('mark')) m.addEventListener('click', () => m.classList.toggle('revealed'));
+}
+
+function renderLegend(spans) {
+  const seen = new Set(spans.map(s => s.label));
+  legend.innerHTML = [...seen].sort().map(l =>
+    `<span><span class="swatch" style="background:${COLORS[l]||'#999'}"></span>${l}</span>`
+  ).join('');
+}
+
+async function classify() {
+  err.textContent = '';
+  btn.disabled = true; btn.textContent = 'Classifying...';
+  const text = inp.value;
+  const t0 = performance.now();
+  try {
+    const res = await fetch('/v1/pii/classify', {
+      method: 'POST', headers: {'content-type':'application/json'},
+      body: JSON.stringify({ text }),
+    });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    const data = await res.json();
+    const ms = Math.round(performance.now() - t0);
+    tim.textContent = `${ms} ms · ${data.spans.length} span${data.spans.length===1?'':'s'}`;
+    render(text, data.spans);
+    renderLegend(data.spans);
+    jbox.textContent = JSON.stringify(data.spans, null, 2);
+  } catch (e) { err.textContent = String(e); }
+  finally { btn.disabled = false; btn.textContent = 'Classify'; }
+}
+
+btn.addEventListener('click', classify);
+inp.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') classify(); });
+
+// Tabs
+document.getElementById('tabText').addEventListener('click', () => {
+  document.getElementById('tabText').classList.add('active');
+  document.getElementById('tabImage').classList.remove('active');
+  document.getElementById('textPanel').classList.remove('hidden');
+  document.getElementById('imagePanel').classList.add('hidden');
+});
+document.getElementById('tabImage').addEventListener('click', () => {
+  document.getElementById('tabImage').classList.add('active');
+  document.getElementById('tabText').classList.remove('active');
+  document.getElementById('imagePanel').classList.remove('hidden');
+  document.getElementById('textPanel').classList.add('hidden');
+});
+
+// Image
+const imageFile = document.getElementById('imageFile');
+const analyzeBtn = document.getElementById('analyzeBtn');
+const renderBtn = document.getElementById('renderBtn');
+const imgTiming = document.getElementById('imgTiming');
+const imgErr = document.getElementById('imgErr');
+const imgPreview = document.getElementById('imgPreview');
+const imgJson = document.getElementById('imgJson');
+let lastAnalysis = null;
+
+imageFile.addEventListener('change', () => {
+  analyzeBtn.disabled = !imageFile.files.length;
+  renderBtn.disabled = true;
+  lastAnalysis = null;
+  imgPreview.classList.add('hidden');
+  imgJson.textContent = 'click Analyze';
+});
+
+analyzeBtn.addEventListener('click', async () => {
+  imgErr.textContent = '';
+  analyzeBtn.disabled = true; analyzeBtn.textContent = 'Analyzing...';
+  const fd = new FormData();
+  fd.append('file', imageFile.files[0]);
+  const t0 = performance.now();
+  try {
+    const res = await fetch('/v1/pii/redact/analyze', { method: 'POST', body: fd });
+    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+    lastAnalysis = await res.json();
+    imgTiming.textContent = `${Math.round(performance.now() - t0)} ms · ${lastAnalysis.spans.length} spans · ${lastAnalysis.rects.length} rects`;
+    imgJson.textContent = JSON.stringify(lastAnalysis, null, 2);
+    renderBtn.disabled = !lastAnalysis.rects.length;
+  } catch (e) { imgErr.textContent = String(e); }
+  finally { analyzeBtn.disabled = false; analyzeBtn.textContent = 'Analyze'; }
+});
+
+renderBtn.addEventListener('click', async () => {
+  if (!lastAnalysis) return;
+  imgErr.textContent = '';
+  renderBtn.disabled = true; renderBtn.textContent = 'Rendering...';
+  const fd = new FormData();
+  fd.append('file', imageFile.files[0]);
+  fd.append('rects', JSON.stringify(lastAnalysis.rects));
+  try {
+    const res = await fetch('/v1/pii/redact/render', { method: 'POST', body: fd });
+    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+    const blob = await res.blob();
+    imgPreview.src = URL.createObjectURL(blob);
+    imgPreview.classList.remove('hidden');
+  } catch (e) { imgErr.textContent = String(e); }
+  finally { renderBtn.disabled = false; renderBtn.textContent = 'Render Redacted'; }
+});
+
+classify();
+</script>
+</body>
+</html>

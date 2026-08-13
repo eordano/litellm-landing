@@ -1,0 +1,1292 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Text Reader</title>
+  <style>
+    :root {
+      --bg-color: #f0f0f0;
+      --text-color: #111827;
+      --header-bg: #ffffff;
+      --card-bg: #ffffff;
+      --border-color: #e5e7eb;
+      --input-bg: #f9fafb;
+      --input-border: #d1d5db;
+      --input-focus-border: #3b82f6;
+      --button-bg: #1c71d8;
+      --button-text: #ffffff;
+      --button-hover-bg: #1a63bA;
+      --button-disabled-bg: #9ca3af;
+      --pre-bg: #f3f4f6;
+      --link-color: #1c71d8;
+      --subtitle-color: #6b7280;
+      --accent: #ffe28a;
+      --accent-soft: rgba(255, 226, 138, 0.5);
+      --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+      color-scheme: light;
+    }
+
+    html[data-theme='dark'] {
+      --bg-color: #111827;
+      --text-color: #f9fafb;
+      --header-bg: #1f2937;
+      --card-bg: #1f2937;
+      --border-color: #374151;
+      --input-bg: #374151;
+      --input-border: #4b5563;
+      --input-focus-border: #60a5fa;
+      --button-bg: #3b82f6;
+      --button-hover-bg: #2563eb;
+      --button-disabled-bg: #4b5563;
+      --pre-bg: #1e2c40;
+      --link-color: #60a5fa;
+      --subtitle-color: #9ca3af;
+      --accent: #ffe28a;
+      --accent-soft: rgba(255, 226, 138, 0.5);
+      --shadow: 0 10px 30px rgba(0,0,0,0.35);
+      color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      font-size: 16px;
+      line-height: 1.6;
+      transition: background-color 0.2s, color 0.2s;
+    }
+
+    header {
+      background-color: var(--header-bg);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0 2rem;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    header h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+    header nav {
+      display: flex;
+      gap: 1rem;
+    }
+    header nav a {
+      color: var(--link-color);
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    header nav a:hover {
+      text-decoration: underline;
+    }
+
+    .wrap{ max-width: 980px; margin: 0 auto; padding: 18px; }
+    .intro{
+      min-height: calc(100vh - 120px);
+      display: grid; align-items: center; justify-items: center;
+      grid-template-rows: auto 1fr auto; gap: 18px;
+    }
+    .card{
+      width: min(920px, 100%); background-color: var(--card-bg); border: 1px solid var(--border-color);
+      border-radius: 0.75rem; box-shadow: var(--shadow); padding: 22px;
+    }
+    .intro h1{ margin: 0 0 6px; font-size: 24px; font-weight: 700; }
+    .intro p.sub{ margin: 0 0 16px; color: var(--subtitle-color); }
+    textarea{
+      width: 100%; min-height: 42vh; resize: vertical; padding: 18px; border-radius: 0.375rem;
+      background-color: var(--input-bg); color: var(--text-color); border: 1px solid var(--input-border);
+      font: 16px/1.6 "SF Mono", "Fira Code", "Source Code Pro", monospace;
+    }
+    textarea:focus {
+      outline: 2px solid transparent;
+      outline-offset: 2px;
+      border-color: var(--input-focus-border);
+      box-shadow: 0 0 0 2px var(--bg-color), 0 0 0 4px var(--input-focus-border);
+    }
+    .row{ display: flex; align-items: center; gap: 12px; justify-content: space-between; margin-top: 16px; }
+    .row .left{ color: var(--subtitle-color); font-size: 13px; }
+
+    button.primary{
+      padding: 0.625rem 1rem;
+      border: none;
+      border-radius: 0.375rem;
+      background-color: var(--button-bg);
+      color: var(--button-text);
+      font-weight: 600;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    button.primary:hover{ background-color: var(--button-hover-bg); }
+    button.primary[disabled]{ background-color: var(--button-disabled-bg); cursor: not-allowed; }
+
+    .player{ display: none; }
+    .layout{
+      display: grid; grid-template-columns: 1fr; gap: 16px;
+    }
+    @media (min-width: 900px){ .layout{ grid-template-columns: 1.1fr 0.9fr; } }
+
+    /* Left column (scrollable, 80% viewport height) */
+    .reader{
+      padding: 16px; background-color: var(--card-bg); border-radius: 0.75rem;
+      border: 1px solid var(--border-color);
+      max-height: 80vh; overflow-y: auto;
+    }
+    .para{
+      padding: 12px 14px; margin: 8px 0; line-height: 1.7; border-radius: 0.375rem; position: relative;
+      background:
+        linear-gradient(90deg,
+          var(--accent-soft) 0 var(--pct, 0%),
+          transparent var(--pct, 0%) 100%);
+      transition: background-size 80ms linear, background-color 120ms ease;
+      white-space: pre-wrap;
+      cursor: pointer;
+      user-select: text;
+    }
+    .para.active{ outline: 1px dashed var(--border-color); background-color: var(--input-bg); }
+    .para small.tag{ position:absolute; right:10px; top:8px; color: var(--subtitle-color); opacity: .8; font-size: 12px; }
+
+    .controls{
+      position: sticky; bottom: 0; z-index: 3;
+      padding: 12px; border-radius: 0.75rem; border: 1px solid var(--border-color);
+      background-color: var(--card-bg); backdrop-filter: blur(6px); box-shadow: var(--shadow);
+      display: grid; grid-template-columns: auto 1fr auto auto auto; align-items: center; gap: 14px;
+    }
+    .btn{
+      min-width: 46px; height: 46px; display: grid; place-items: center; border-radius: 0.375rem; border: 1px solid var(--border-color);
+      background-color: var(--input-bg); cursor: pointer; font-size: 18px; color: var(--text-color);
+    }
+    .btn:disabled{ opacity: .5; cursor: not-allowed; }
+    .btn:active{ transform: translateY(1px); }
+    .time{ font-variant-numeric: tabular-nums; color: var(--subtitle-color); }
+    select{ background-color: var(--input-bg); color: var(--text-color); border:1px solid var(--input-border); padding:8px 10px; border-radius:0.375rem; }
+
+    .hint{ color: var(--subtitle-color); font-size: 13px; margin-top: 6px; }
+    .hidden{ display: none !important; }
+    .spinner{
+      width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--border-color); border-top-color: var(--link-color);
+      animation: spin .9s linear infinite; display: inline-block; vertical-align: text-bottom;
+    }
+    @keyframes spin{ to{ transform: rotate(360deg) } }
+
+    .config{
+      display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; color: var(--subtitle-color); font-size: 13px;
+    }
+    .config input{
+      background-color: var(--input-bg); color: var(--text-color); border:1px solid var(--input-border); padding:8px 10px; border-radius:0.375rem;
+      min-width: 230px;
+    }
+    .config input:focus {
+      outline: 2px solid transparent;
+      outline-offset: 2px;
+      border-color: var(--input-focus-border);
+      box-shadow: 0 0 0 2px var(--bg-color), 0 0 0 4px var(--input-focus-border);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Text Reader</h1>
+    <nav>
+      <a href="../index.html">Inference</a>
+      <a href="../voice/index.html">Voice</a>
+      <a href="../realtime/index.html">Realtime</a>
+      <a href="../ocr/index.html">OCR</a>
+    </nav>
+  </header>
+
+  <div class="wrap">
+
+    <!-- INTRO -->
+    <section class="intro" id="intro">
+      <div class="card">
+        <h1>Have your blogpost read out loud</h1>
+        <p class="sub">Paste your text below. We'll split it by <em>double newlines</em>, send each paragraph to a TTS endpoint, and play it with synchronized highlighting.</p>
+
+        <textarea id="input" placeholder="Paste your blogpost here...
+
+Tip: Separate paragraphs with a blank line (double newline)."></textarea>
+
+        <div class="row">
+          <div class="left">
+            <span id="charCount">0</span> characters
+          </div>
+          <div class="right">
+            <button id="go" class="primary" disabled>Go</button>
+          </div>
+        </div>
+
+        <div class="config">
+          <label>Endpoint
+            <input id="endpoint" value="/v1/audio/speech" />
+          </label>
+          <label>Model
+            <input id="model" value="tts-default" />
+          </label>
+          <label>Voice
+            <select id="voice">
+              <optgroup label="American English - Female">
+                <option value="af_heart" selected>Heart (Default)</option>
+                <option value="af_alloy">Alloy</option>
+                <option value="af_aoede">Aoede</option>
+                <option value="af_bella">Bella</option>
+                <option value="af_jessica">Jessica</option>
+                <option value="af_kore">Kore</option>
+                <option value="af_nicole">Nicole</option>
+                <option value="af_nova">Nova</option>
+                <option value="af_river">River</option>
+                <option value="af_sarah">Sarah</option>
+                <option value="af_sky">Sky</option>
+              </optgroup>
+              <optgroup label="American English - Male">
+                <option value="am_adam">Adam</option>
+                <option value="am_echo">Echo</option>
+                <option value="am_eric">Eric</option>
+                <option value="am_fenrir">Fenrir</option>
+                <option value="am_liam">Liam</option>
+                <option value="am_michael">Michael</option>
+                <option value="am_onyx">Onyx</option>
+                <option value="am_puck">Puck</option>
+                <option value="am_santa">Santa</option>
+              </optgroup>
+              <optgroup label="British English - Female">
+                <option value="bf_alice">Alice</option>
+                <option value="bf_emma">Emma</option>
+                <option value="bf_isabella">Isabella</option>
+                <option value="bf_lily">Lily</option>
+              </optgroup>
+              <optgroup label="British English - Male">
+                <option value="bm_daniel">Daniel</option>
+                <option value="bm_fable">Fable</option>
+                <option value="bm_george">George</option>
+                <option value="bm_lewis">Lewis</option>
+              </optgroup>
+              <optgroup label="Japanese - Female">
+                <option value="jf_alpha">Alpha</option>
+                <option value="jf_gongitsune">Gongitsune</option>
+                <option value="jf_nezumi">Nezumi</option>
+                <option value="jf_tebukuro">Tebukuro</option>
+              </optgroup>
+              <optgroup label="Japanese - Male">
+                <option value="jm_kumo">Kumo</option>
+              </optgroup>
+              <optgroup label="Mandarin Chinese - Female">
+                <option value="zf_xiaobei">Xiaobei</option>
+                <option value="zf_xiaoni">Xiaoni</option>
+                <option value="zf_xiaoxiao">Xiaoxiao</option>
+                <option value="zf_xiaoyi">Xiaoyi</option>
+              </optgroup>
+              <optgroup label="Mandarin Chinese - Male">
+                <option value="zm_yunjian">Yunjian</option>
+                <option value="zm_yunxi">Yunxi</option>
+                <option value="zm_yunxia">Yunxia</option>
+                <option value="zm_yunyang">Yunyang</option>
+              </optgroup>
+              <optgroup label="Spanish - Female">
+                <option value="ef_dora">Dora</option>
+              </optgroup>
+              <optgroup label="Spanish - Male">
+                <option value="em_alex">Alex</option>
+                <option value="em_santa">Santa</option>
+              </optgroup>
+              <optgroup label="French - Female">
+                <option value="ff_siwis">Siwis</option>
+              </optgroup>
+              <optgroup label="Hindi - Female">
+                <option value="hf_alpha">Alpha</option>
+                <option value="hf_beta">Beta</option>
+              </optgroup>
+              <optgroup label="Hindi - Male">
+                <option value="hm_omega">Omega</option>
+                <option value="hm_psi">Psi</option>
+              </optgroup>
+              <optgroup label="Italian - Female">
+                <option value="if_sara">Sara</option>
+              </optgroup>
+              <optgroup label="Italian - Male">
+                <option value="im_nicola">Nicola</option>
+              </optgroup>
+              <optgroup label="Brazilian Portuguese - Female">
+                <option value="pf_dora">Dora</option>
+              </optgroup>
+              <optgroup label="Brazilian Portuguese - Male">
+                <option value="pm_alex">Alex</option>
+                <option value="pm_santa">Santa</option>
+              </optgroup>
+            </select>
+          </label>
+        </div>
+        <p class="hint">Uses TTS API by default. You can change the endpoint to any OpenAI-compatible TTS service. Markdown, URLs, code blocks, and HTML tags are automatically stripped before sending to TTS.</p>
+      </div>
+    </section>
+
+    <!-- PLAYER -->
+    <section class="player" id="player">
+      <div class="layout">
+        <div class="reader" id="reader" title="Click a paragraph to jump (click within current paragraph to scrub)."></div>
+
+        <div>
+          <div class="card">
+            <h2 style="margin:0 0 8px;">Playback</h2>
+            <p class="hint" id="statusLine"><span class="spinner"></span> Building audio...</p>
+
+            <div class="controls" aria-label="audio controls">
+              <button class="btn" id="playPause" title="Play/Pause" disabled>▶</button>
+
+              <div class="time" id="timeBlock">
+                <span id="tCur">0:00</span> / <span id="tTot">-:-</span>
+              </div>
+
+              <label class="time" style="display:flex; align-items:center; gap:8px;">
+                Speed
+                <select id="rate">
+                  <option value="0.5">0.5x</option>
+                  <option value="0.75">0.75x</option>
+                  <option value="1" selected>1x</option>
+                  <option value="1.25">1.25x</option>
+                  <option value="1.5">1.5x</option>
+                  <option value="1.75">1.75x</option>
+                  <option value="2">2x</option>
+                </select>
+              </label>
+
+              <button class="btn" id="downloadAll" title="Download full audio" disabled>⬇</button>
+            </div>
+
+            <p class="hint" style="margin-top:10px;">
+              Click any paragraph to jump there. Click inside the current paragraph to scrub to the clicked position. Each paragraph includes a brief 400 ms pause.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // ---------- Theme detection ----------
+    const theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', theme);
+
+    // ---------- Simple helpers ----------
+    const $$ = sel => document.querySelector(sel);
+    const fmtTime = (s) => {
+      if (!isFinite(s) || s < 0) return '-:-';
+      const m = Math.floor(s/60);
+      const sec = Math.floor(s%60).toString().padStart(2,'0');
+      return `${m}:${sec}`;
+    };
+    const clamp01 = x => Math.max(0, Math.min(1, x));
+
+    // ---------- Elements ----------
+    const elIntro = $$("#intro");
+    const elPlayer = $$("#player");
+    const elInput = $$("#input");
+    const elGo = $$("#go");
+    const elCharCount = $$("#charCount");
+
+    const elReader = $$("#reader");
+    const elStatus = $$("#statusLine");
+    const elPlayPause = $$("#playPause");
+    const elCur = $$("#tCur");
+    const elTot = $$("#tTot");
+    const elRate = $$("#rate");
+    const elDownloadAll = $$("#downloadAll");
+
+    const elEndpoint = $$("#endpoint");
+    const elModel = $$("#model");
+    const elVoice = $$("#voice");
+
+    // ---------- State ----------
+    const PAUSE_MS = 400;
+    let paragraphs = [];
+    let audioURLs = [];        // blob URLs by paragraph
+    let audioTags = [];        // HTMLAudioElement by paragraph
+    let audioBlobs = [];       // raw Blobs by paragraph (null = failed, undefined = not fetched)
+    let durations = [];        // seconds by paragraph (filled after metadata)
+    let estDurations = [];     // pre-estimates to size timeline early
+    let starts = [];           // virtual start times including 400ms gaps
+    let totalDuration = 0;     // virtual total
+    let firstAudioReady = false;
+
+    let currentIndex = 0;
+    let currentAudio = null;
+    let playing = false;
+    let rafId = null;
+
+    // NEW: User intent tracking and race condition prevention
+    let wantToPlay = false;      // User's intent, separate from actual playback state
+    let seekGeneration = 0;      // Incremented on every seek to cancel stale operations
+
+    // NEW: Priority queue for adaptive loading
+    let fetchQueue = [];         // [{idx, priority}, ...]
+    let inFlight = new Set();    // Currently fetching indices
+    const MAX_CONCURRENT = 4;
+
+    // ---------- NEW: Reset state for fresh start ----------
+    function resetState() {
+      // Revoke all existing blob URLs to free memory
+      audioURLs.forEach(url => {
+        if (url) URL.revokeObjectURL(url);
+      });
+
+      // Clear all state arrays
+      audioURLs = [];
+      audioTags = [];
+      audioBlobs = [];
+      durations = [];
+      estDurations = [];
+      starts = [];
+
+      // Reset state variables
+      totalDuration = 0;
+      firstAudioReady = false;
+      currentIndex = 0;
+      currentAudio = null;
+      playing = false;
+      wantToPlay = false;
+      seekGeneration = 0;
+
+      // Clear queue and in-flight tracking
+      fetchQueue = [];
+      inFlight = new Set();
+
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    }
+
+    // ---------- NEW: Priority queue functions ----------
+    function enqueueFetch(idx, priority) {
+      // Skip if already loaded or failed
+      if (audioBlobs[idx] !== undefined) return;
+
+      // Skip if already in flight
+      if (inFlight.has(idx)) return;
+
+      // Update priority if already in queue
+      const existing = fetchQueue.find(item => item.idx === idx);
+      if (existing) {
+        existing.priority = Math.min(existing.priority, priority);
+      } else {
+        fetchQueue.push({ idx, priority });
+      }
+
+      // Sort by priority (lower number = higher priority)
+      fetchQueue.sort((a, b) => a.priority - b.priority);
+
+      processQueue();
+    }
+
+    function reprioritize(targetIdx) {
+      // When user seeks to targetIdx, make it and next paragraphs high priority
+      for (let i = 0; i < fetchQueue.length; i++) {
+        const item = fetchQueue[i];
+        const distance = Math.abs(item.idx - targetIdx);
+
+        if (item.idx === targetIdx) {
+          item.priority = 0;
+        } else if (item.idx > targetIdx && item.idx <= targetIdx + 3) {
+          item.priority = item.idx - targetIdx;
+        } else {
+          // Lower priority for others, but keep relative ordering
+          item.priority = 1000 + item.idx;
+        }
+      }
+
+      fetchQueue.sort((a, b) => a.priority - b.priority);
+      processQueue();
+    }
+
+    function processQueue() {
+      while (fetchQueue.length > 0 && inFlight.size < MAX_CONCURRENT) {
+        const item = fetchQueue.shift();
+
+        // Double-check it's not already loaded
+        if (audioBlobs[item.idx] !== undefined) continue;
+
+        inFlight.add(item.idx);
+        fetchParagraphTTS(item.idx).finally(() => {
+          inFlight.delete(item.idx);
+          processQueue(); // Process next item
+        });
+      }
+    }
+
+    // ---------- Intro interactions ----------
+    elInput.addEventListener('input', () => {
+      const val = elInput.value;
+      elCharCount.textContent = val.length.toString();
+      elGo.disabled = val.trim().length === 0;
+    });
+
+    elGo.addEventListener('click', async () => {
+      const raw = elInput.value;
+      // Split by double newlines, then split oversized paragraphs
+      paragraphs = raw.split(/\n{2,}/).map(s => s.trim()).filter(Boolean)
+        .flatMap(p => splitLongParagraph(p));
+      if (!paragraphs.length) return;
+
+      // Reset all state for fresh start
+      resetState();
+
+      // Build reader view
+      elReader.innerHTML = paragraphs.map((p, i) =>
+        `<p class="para" data-idx="${i}" id="para-${i}">
+          ${escapeHtml(p)}
+          <small class="tag" id="tag-${i}">Waiting...</small>
+        </p>`
+      ).join('');
+
+      // Pre-size timeline using a crude estimate (3 words/sec)
+      estDurations = paragraphs.map(p => Math.max(1, p.split(/\s+/).filter(Boolean).length / 3));
+      recomputeStarts();
+
+      // Switch UI
+      elIntro.style.display = 'none';
+      elPlayer.style.display = 'block';
+      elPlayPause.disabled = true;
+      elCur.textContent = "0:00";
+      elTot.textContent = fmtTime(totalDuration);
+
+      // NEW: Show loading message for first paragraph
+      elStatus.innerHTML = '<span class="spinner"></span> Loading first section...';
+
+      // NEW: Set user intent to play immediately
+      wantToPlay = true;
+
+      // NEW: Enqueue all paragraphs with initial priority (sequential order)
+      for (let i = 0; i < paragraphs.length; i++) {
+        enqueueFetch(i, i);
+      }
+    });
+
+    // ---------- TTS fetch (OpenAI-compatible /v1/audio/speech) ----------
+    const BASE_TIMEOUT_MS = 8000;
+    const TIMEOUT_PER_CHAR_MS = 10;  // extra ms per character for long text
+    const MAX_RETRIES = 3;
+
+    function timeoutForText(text) {
+      return Math.min(BASE_TIMEOUT_MS + text.length * TIMEOUT_PER_CHAR_MS, 60000);
+    }
+
+    async function fetchWithTimeout(url, options, timeoutMs) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(url, { ...options, signal: controller.signal });
+        clearTimeout(timeoutId);
+        return res;
+      } catch (err) {
+        clearTimeout(timeoutId);
+        throw err;
+      }
+    }
+
+    async function fetchParagraphTTS(idx, attempt = 1){
+      const endpoint = elEndpoint.value.trim();
+      const model = elModel.value.trim();
+      const voice = elVoice.value.trim();
+
+      // Strip markdown/special chars before sending to TTS
+      const cleanText = stripForTTS(paragraphs[idx]);
+
+      // Skip empty or very short paragraphs (noise from web scraping, nav elements, etc.)
+      if (!cleanText || cleanText.length < 8) {
+        audioBlobs[idx] = null;
+        updateTag(idx, "Skipped");
+        return;
+      }
+
+      const body = { model, voice, input: cleanText };
+      const headers = { "Content-Type": "application/json", "Accept": "*/*" };
+
+      let blob;
+      try{
+        if (attempt > 1) {
+          updateTag(idx, `Retry ${attempt}/${MAX_RETRIES}...`);
+        }
+        const res = await fetchWithTimeout(endpoint, { method: "POST", headers, body: JSON.stringify(body) }, timeoutForText(cleanText));
+        if(!res.ok) {
+          // Try to read error body for better diagnostics
+          let detail = '';
+          try {
+            const errText = await res.text();
+            const errJson = JSON.parse(errText);
+            detail = errJson.error?.message || errJson.message || errText.slice(0, 120);
+          } catch { detail = `HTTP ${res.status}`; }
+          throw new Error(`TTS error ${res.status}: ${detail}`);
+        }
+        blob = await res.blob();
+      }catch(err){
+        console.error(`Paragraph ${idx} attempt ${attempt} failed:`, err);
+
+        // Retry if we haven't exceeded max retries
+        if (attempt < MAX_RETRIES) {
+          const isTimeout = err.name === 'AbortError';
+          console.log(`Retrying paragraph ${idx} (${isTimeout ? 'timeout' : 'error'})...`);
+          return fetchParagraphTTS(idx, attempt + 1);
+        }
+
+        // Mark as failed after all retries exhausted
+        audioBlobs[idx] = null;
+        showRetryButton(idx);
+        return;
+      }
+
+      audioBlobs[idx] = blob;
+
+      const url = URL.createObjectURL(blob);
+      audioURLs[idx] = url;
+
+      // Create an <audio> tag per paragraph to read duration + for playback
+      const a = new Audio();
+      a.src = url;
+      a.preload = "metadata";
+
+      audioTags[idx] = a;
+      updateTag(idx, "Loading...");
+
+      await waitForEvent(a, "loadedmetadata").catch(()=>{});
+      if (isFinite(a.duration) && a.duration > 0) {
+        durations[idx] = a.duration;
+      } else {
+        durations[idx] = estDurations[idx]; // best effort
+      }
+      updateTag(idx, fmtTime(durations[idx]));
+
+      // If this is the first audio we've gotten back, unlock the player UI
+      if (!firstAudioReady) {
+        firstAudioReady = true;
+        elPlayPause.disabled = false;
+        setActivePara(0);
+
+        // NEW: Auto-play if user still wants to play (streaming playback)
+        if (wantToPlay && idx === 0) {
+          startPlaybackAt(0, 0);
+        } else {
+          elStatus.textContent = "Ready (click a paragraph or press ▶)";
+        }
+      }
+
+      // Recompute total as real durations arrive
+      const prevTotal = totalDuration;
+      recomputeStarts();
+      elTot.textContent = fmtTime(totalDuration);
+
+      // If the current paragraph got a duration update, refresh highlight % immediately
+      if (idx === currentIndex && currentAudio) {
+        const durThis = (Number.isFinite(durations[idx]) ? durations[idx] : estDurations[idx]) || 1;
+        updateHighlight(idx, currentAudio.currentTime / durThis);
+      }
+
+      // Enable "Download All" once every blob is in
+      checkAllReady();
+
+      // Update loading progress
+      updateLoadingProgress();
+    }
+
+    // NEW: Show retry button for failed paragraphs
+    function showRetryButton(idx) {
+      const tagEl = $(`#tag-${idx}`);
+      if (!tagEl) return;
+
+      tagEl.innerHTML = '<button style="cursor:pointer; background:#ff4444; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:11px;" onclick="retryParagraph(' + idx + ')">Retry</button>';
+    }
+
+    // NEW: Retry fetching a failed paragraph
+    window.retryParagraph = function(idx) {
+      audioBlobs[idx] = undefined; // Reset to unfetched state
+      updateTag(idx, "Retrying...");
+      enqueueFetch(idx, 0); // High priority
+    };
+
+    // NEW: Update loading progress indicator
+    function updateLoadingProgress() {
+      const loaded = audioBlobs.filter(b => b !== undefined && b !== null).length;
+      const total = paragraphs.length;
+
+      // Only show loading progress if not actively playing/seeking/buffering
+      // wantToPlay is true when user is actively seeking or wants playback
+      if (loaded < total && !playing && !wantToPlay) {
+        elStatus.textContent = `Loading... (${loaded}/${total} paragraphs)`;
+      }
+    }
+
+    function checkAllReady(){
+      const allReady = paragraphs.length > 0 && audioBlobs.filter(Boolean).length === paragraphs.length;
+      elDownloadAll.disabled = !allReady;
+      if (allReady) {
+        elStatus.textContent = "All audio ready.";
+      }
+    }
+
+    // ---------- Playback engine (virtual timeline over multiple <audio>) ----------
+    function recomputeStarts(){
+      const n = paragraphs.length;
+      starts = new Array(n).fill(0);
+      let acc = 0;
+      for (let i=0;i<n;i++){
+        starts[i] = acc;
+        const d = Number.isFinite(durations[i]) ? durations[i] : estDurations[i];
+        acc += d;
+        if (i < n-1) acc += PAUSE_MS/1000;
+      }
+      totalDuration = acc;
+    }
+
+    function setActivePara(i){
+      document.querySelectorAll('.para').forEach(p => p.classList.remove('active'));
+      const el = $(`#para-${i}`);
+      if (el){
+        el.classList.add('active');
+        // Keep it in view but don't yank scroll too aggressively
+        el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+
+    function updateHighlight(i, pct){
+      for (let k=0;k<paragraphs.length;k++){
+        const el = $(`#para-${k}`);
+        if (!el) continue;
+        if (k < i) {
+          el.style.setProperty('--pct', '100%');
+        } else if (k === i) {
+          el.style.setProperty('--pct', `${Math.round(clamp01(pct)*100)}%`);
+        } else {
+          el.style.setProperty('--pct', '0%');
+        }
+      }
+    }
+
+    function $(sel){ return document.querySelector(sel); }
+    function escapeHtml(s){ return s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+    function updateTag(i, text){ const t = $(`#tag-${i}`); if (t) t.textContent = text; }
+
+    // ---------- Markdown / special-char stripping for TTS input ----------
+    function stripForTTS(text) {
+      let t = text;
+
+      // Remove code blocks (``` ... ```) -- replace with "code block omitted"
+      t = t.replace(/```[\s\S]*?```/g, ' (code omitted) ');
+
+      // Remove orphan backticks (from code blocks split across paragraphs)
+      t = t.replace(/`/g, '');
+
+      // Remove images ![alt](url) -- speak alt text only
+      t = t.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1');
+
+      // Remove empty links [](url) and anchor links [](#anchor) -- no text to keep
+      t = t.replace(/\[\s*\]\([^)]*\)/g, ' ');
+
+      // Remove links [text](url) -- keep link text
+      t = t.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1');
+
+      // Remove reference-style links [text][ref]
+      t = t.replace(/\[([^\]]+)\]\[[^\]]*\]/g, '$1');
+
+      // Remove reference definitions [ref]: url "title"
+      t = t.replace(/^\s*\[[^\]]+\]:\s*\S+.*$/gm, '');
+
+      // Remove HTML tags
+      t = t.replace(/<[^>]+>/g, ' ');
+
+      // Remove heading markers (# ## ### etc.) -- both line-start and mid-text
+      t = t.replace(/#{1,6}\s+/g, '');
+
+      // Remove bold/italic markers (**, __, *, _) but keep the text
+      t = t.replace(/(\*{1,3}|_{1,3})(\S[\s\S]*?\S|\S)\1/g, '$2');
+
+      // Remove strikethrough ~~text~~
+      t = t.replace(/~~([\s\S]*?)~~/g, '$1');
+
+      // Remove blockquote markers
+      t = t.replace(/^>\s?/gm, '');
+
+      // Remove horizontal rules (---, ***, ___)
+      t = t.replace(/^[-*_]{3,}\s*$/gm, '');
+
+      // Remove unordered list markers (-, *, +)
+      t = t.replace(/^[\s]*[-*+]\s+/gm, '');
+
+      // Remove ordered list markers (1., 2., etc.)
+      t = t.replace(/^[\s]*\d+\.\s+/gm, '');
+
+      // Remove bare URLs (http/https)
+      t = t.replace(/https?:\/\/\S+/g, ' ');
+
+      // Remove table formatting: lines that are mostly pipes and dashes (header separators)
+      t = t.replace(/^\|?[\s\-:|]+\|[\s\-:|]*$/gm, '');
+      // Remove leading/trailing pipes from table rows, keep cell content
+      t = t.replace(/^\||\|$/gm, '');
+      // Replace inner pipes with commas for natural reading
+      t = t.replace(/\s*\|\s*/g, ', ');
+
+      // Remove leftover bracket-only fragments like [](#anchor) that survived
+      t = t.replace(/\[\s*\]\(#[^)]*\)/g, '');
+      // Remove leftover square brackets but keep content: [text] -> text
+      t = t.replace(/\[([^\]]*)\]/g, '$1');
+
+      // Remove orphan brackets that remain
+      t = t.replace(/[\[\]]/g, '');
+
+      // Remove leftover markdown emphasis chars that didn't match pairs
+      t = t.replace(/[*_]{1,3}/g, '');
+
+      // Remove @ mentions (Twitter/GitHub style)
+      t = t.replace(/@\w+/g, '');
+
+      // Collapse multiple spaces / normalize whitespace
+      t = t.replace(/[ \t]+/g, ' ');
+
+      // Collapse multiple newlines within a paragraph into single space
+      t = t.replace(/\n+/g, ' ');
+
+      return t.trim();
+    }
+
+    // ---------- Split oversized paragraphs at sentence boundaries ----------
+    const MAX_PARAGRAPH_CHARS = 1500;
+
+    function splitLongParagraph(text) {
+      if (text.length <= MAX_PARAGRAPH_CHARS) return [text];
+
+      // Split at sentence boundaries (. ! ? followed by space or end)
+      const sentences = text.match(/[^.!?]*[.!?]+[\s]*/g) || [text];
+      const chunks = [];
+      let current = '';
+
+      for (const sentence of sentences) {
+        if (current.length + sentence.length > MAX_PARAGRAPH_CHARS && current.length > 0) {
+          chunks.push(current.trim());
+          current = sentence;
+        } else {
+          current += sentence;
+        }
+      }
+      if (current.trim()) chunks.push(current.trim());
+
+      // If any chunk is still too long (no sentence boundaries found), split at word boundaries
+      const result = [];
+      for (const chunk of chunks) {
+        if (chunk.length <= MAX_PARAGRAPH_CHARS) {
+          result.push(chunk);
+        } else {
+          const words = chunk.split(/\s+/);
+          let sub = '';
+          for (const word of words) {
+            if (sub.length + word.length + 1 > MAX_PARAGRAPH_CHARS && sub.length > 0) {
+              result.push(sub.trim());
+              sub = word;
+            } else {
+              sub += (sub ? ' ' : '') + word;
+            }
+          }
+          if (sub.trim()) result.push(sub.trim());
+        }
+      }
+
+      return result;
+    }
+
+    function waitForEvent(target, type){
+      return new Promise((res, rej) => {
+        const on = () => { cleanup(); res(); };
+        const er = (e) => { cleanup(); rej(e); };
+        const cleanup = () => { target.removeEventListener(type,on); target.removeEventListener('error',er); };
+        target.addEventListener(type, on, { once: true });
+        target.addEventListener('error', er, { once: true });
+      });
+    }
+
+    function ensureAudioFor(i){
+      if (audioTags[i]) return audioTags[i];
+      if (!audioURLs[i]) return null;
+      const a = new Audio(audioURLs[i]);
+      a.preload = "metadata";
+      audioTags[i] = a;
+      return a;
+    }
+
+    async function startPlaybackAt(idx, offsetSec){
+      // NEW: Increment seek generation to cancel stale operations
+      const myGen = ++seekGeneration;
+
+      // NEW: Proper audio cleanup before switching
+      if (currentAudio){
+        currentAudio.pause();
+        currentAudio.onended = null;
+        currentAudio.onerror = null;
+      }
+
+      currentIndex = idx;
+      setActivePara(idx);
+
+      // NEW: Reprioritize queue to load this paragraph and next ones first
+      reprioritize(idx);
+
+      // Check if paragraph failed
+      if (audioBlobs[idx] === null) {
+        // Failed paragraph - skip to next
+        elStatus.textContent = `Paragraph ${idx + 1} failed, skipping...`;
+        updateHighlight(idx, 1);
+
+        // Wait briefly then move to next
+        await new Promise(resolve => setTimeout(resolve, 800));
+
+        // Check if we're still on this generation
+        if (myGen !== seekGeneration) return;
+
+        const next = idx + 1;
+        if (next < paragraphs.length && wantToPlay) {
+          startPlaybackAt(next, 0);
+        } else {
+          playing = false;
+          wantToPlay = false;
+          elPlayPause.textContent = "▶";
+          elStatus.textContent = "Stopped at failed paragraph";
+        }
+        return;
+      }
+
+      const a = ensureAudioFor(idx);
+      if (!a){
+        // not ready yet; wait for it
+        elStatus.innerHTML = `<span class="spinner"></span> Buffering paragraph ${idx + 1}...`;
+        currentAudio = null;
+        playing = false;  // Not actively playing while buffering
+        elPlayPause.textContent = "⏸";  // Show pause since we intend to play
+
+        // NEW: Wait for audio with generation checking
+        const pollInterval = setInterval(() => {
+          // Check if this operation was cancelled by a new seek
+          if (myGen !== seekGeneration) {
+            clearInterval(pollInterval);
+            return;
+          }
+
+          // Check if user paused while we were buffering
+          if (!wantToPlay) {
+            clearInterval(pollInterval);
+            elStatus.textContent = "Paused";
+            return;
+          }
+
+          // Check if paragraph failed while we were waiting
+          if (audioBlobs[idx] === null) {
+            clearInterval(pollInterval);
+            elStatus.textContent = `Paragraph ${idx + 1} failed, skipping...`;
+            const next = idx + 1;
+            if (next < paragraphs.length) {
+              setTimeout(() => {
+                if (wantToPlay && myGen === seekGeneration) {
+                  startPlaybackAt(next, 0);
+                }
+              }, 800);
+            } else {
+              wantToPlay = false;
+              elPlayPause.textContent = "▶";
+              elStatus.textContent = "Stopped at failed paragraph";
+            }
+            return;
+          }
+
+          const ready = ensureAudioFor(idx);
+          if (ready && ready.readyState >= 1){
+            clearInterval(pollInterval);
+
+            // Double-check generation hasn't changed
+            if (myGen !== seekGeneration) return;
+
+            // Continue only if user still wants to play
+            if (wantToPlay) {
+              startPlaybackAt(idx, offsetSec);
+            } else {
+              elStatus.textContent = "Paused";
+            }
+          }
+        }, 150);
+        return;
+      }
+
+      // Check generation before continuing
+      if (myGen !== seekGeneration) return;
+
+      currentAudio = a;
+      currentAudio.playbackRate = parseFloat(elRate.value);
+
+      // Ensure metadata so we can clamp offset
+      if (!isFinite(currentAudio.duration) || currentAudio.duration === 0) {
+        try { await waitForEvent(currentAudio, 'loadedmetadata'); } catch {}
+      }
+
+      // Check generation after async operation
+      if (myGen !== seekGeneration) return;
+
+      const dur = currentAudio.duration || durations[idx] || estDurations[idx] || 1;
+      const off = Math.min(Math.max(0, offsetSec), dur);
+      try { currentAudio.currentTime = off; } catch {}
+
+      // NEW: Capture values in closure to avoid stale references
+      const capturedIdx = idx;
+      const capturedGen = myGen;
+
+      currentAudio.onended = () => {
+        // Check if this handler is stale
+        if (capturedGen !== seekGeneration) return;
+
+        updateHighlight(capturedIdx, 1);
+        const next = capturedIdx + 1;
+
+        if (next < paragraphs.length && wantToPlay) {
+          setTimeout(() => {
+            // Double-check generation and intent before continuing
+            if (capturedGen === seekGeneration && wantToPlay) {
+              startPlaybackAt(next, 0);
+            }
+          }, PAUSE_MS);
+        } else {
+          playing = false;
+          wantToPlay = false;
+          elPlayPause.textContent = "▶";
+          cancelAnimationFrame(rafId);
+          elCur.textContent = fmtTime(totalDuration);
+          updateHighlight(capturedIdx, 1);
+          elStatus.textContent = "Done";
+        }
+      };
+
+      // Only play if user still wants to play
+      if (!wantToPlay) {
+        playing = false;
+        elPlayPause.textContent = "▶";
+        elStatus.textContent = "Paused";
+        return;
+      }
+
+      try {
+        await currentAudio.play();
+
+        // Check generation after async play
+        if (myGen !== seekGeneration) return;
+
+        playing = true;
+        elPlayPause.textContent = "⏸";
+        elStatus.textContent = "Playing";
+        tick();
+      } catch (e) {
+        console.error('Play error:', e);
+        playing = false;
+        wantToPlay = false;
+        elPlayPause.textContent = "▶";
+        elStatus.textContent = "Playback error";
+      }
+    }
+
+    function tick(){
+      if (!playing){
+        cancelAnimationFrame(rafId);
+        return;
+      }
+      const durThis = (Number.isFinite(durations[currentIndex]) ? durations[currentIndex] : estDurations[currentIndex]) || 1;
+      const curVirtual = starts[currentIndex] + (currentAudio ? currentAudio.currentTime : 0);
+      elCur.textContent = fmtTime(curVirtual);
+      elTot.textContent = fmtTime(totalDuration);
+
+      const pct = currentAudio ? (currentAudio.currentTime / durThis) : 0;
+      updateHighlight(currentIndex, pct);
+
+      rafId = requestAnimationFrame(tick);
+    }
+
+    // ---------- Controls ----------
+    elPlayPause.addEventListener('click', () => {
+      if (!firstAudioReady) return;
+
+      // Use wantToPlay as primary state (covers both playing and buffering)
+      if (!wantToPlay){
+        // User wants to play/resume
+        wantToPlay = true;
+        elPlayPause.textContent = "⏸";
+
+        // Check if we've completed playback (at end)
+        if (currentIndex >= paragraphs.length - 1 && currentAudio && currentAudio.ended) {
+          // Restart from beginning
+          startPlaybackAt(0, 0);
+        } else {
+          // Resume from current position
+          const offset = currentAudio ? currentAudio.currentTime : 0;
+          startPlaybackAt(currentIndex, offset);
+        }
+      } else {
+        // User wants to pause (works for both playing and buffering states)
+        wantToPlay = false;
+        playing = false;
+
+        if (currentAudio) currentAudio.pause();
+        elPlayPause.textContent = "▶";
+        elStatus.textContent = "Paused";
+        cancelAnimationFrame(rafId);
+      }
+    });
+
+    elRate.addEventListener('change', () => {
+      const r = parseFloat(elRate.value);
+      if (currentAudio) currentAudio.playbackRate = r;
+    });
+
+    // Click to seek (paragraph jump or intra-paragraph scrub)
+    elReader.addEventListener('click', (e) => {
+      const para = e.target.closest('.para');
+      if (!para) return;
+
+      // Don't seek if clicking on retry button
+      if (e.target.tagName === 'BUTTON') return;
+
+      const idx = Number(para.dataset.idx);
+      const dur = (Number.isFinite(durations[idx]) ? durations[idx] : estDurations[idx]) || 1;
+
+      // If it's the current paragraph, interpolate using click X within its box
+      let offset = 0;
+      if (idx === currentIndex && dur > 0) {
+        const rect = para.getBoundingClientRect();
+        const pct = clamp01((e.clientX - rect.left) / rect.width);
+        offset = pct * dur;
+      }
+
+      // Clicking a paragraph means user wants to play
+      wantToPlay = true;
+      startPlaybackAt(idx, offset);
+    });
+
+    // Keyboard accessibility: space toggles play/pause
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && !e.target.matches('textarea, input')) {
+        e.preventDefault();
+        elPlayPause.click();
+      }
+    });
+
+    // ---------- Download: concatenate all audio into a single WAV ----------
+    elDownloadAll.addEventListener('click', async () => {
+      if (elDownloadAll.disabled) return;
+      try {
+        elDownloadAll.disabled = true;
+        elDownloadAll.textContent = '...';
+        elStatus.innerHTML = '<span class="spinner"></span> Preparing download...';
+        const wav = await concatenateToWav(audioBlobs, PAUSE_MS);
+        const url = URL.createObjectURL(wav);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'audio.wav';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+        elStatus.textContent = 'WAV exported.';
+      } catch (e) {
+        console.error(e);
+        elStatus.textContent = '❌ Download failed';
+      } finally {
+        elDownloadAll.textContent = '⬇';
+        checkAllReady(); // re-enable if still valid
+      }
+    });
+
+    async function concatenateToWav(blobs, pauseMs){
+      // Decode each blob to AudioBuffer (skip null/failed blobs)
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      const ctx = new AudioCtx();
+      const buffers = [];
+      for (const b of blobs){
+        if (!b) continue; // Skip failed paragraphs
+        const arr = await b.arrayBuffer();
+        const buf = await ctx.decodeAudioData(arr.slice(0));
+        buffers.push(buf);
+      }
+
+      if (buffers.length === 0) {
+        throw new Error('No valid audio to export');
+      }
+
+      // Compose in OfflineAudioContext at 44100 Hz (resampled automatically)
+      const sr = 44100;
+      const channels = Math.max(...buffers.map(b => b.numberOfChannels), 1);
+      const totalSec = buffers.reduce((acc, b, i) => acc + b.duration + (i < buffers.length-1 ? pauseMs/1000 : 0), 0);
+      const totalFrames = Math.ceil(totalSec * sr);
+      const off = new OfflineAudioContext(channels, totalFrames, sr);
+
+      let t = 0;
+      for (let i=0;i<buffers.length;i++){
+        const src = off.createBufferSource();
+        src.buffer = buffers[i];
+        src.connect(off.destination);
+        src.start(t);
+        t += buffers[i].duration + (i < buffers.length-1 ? pauseMs/1000 : 0);
+      }
+      const rendered = await off.startRendering();
+      return encodeWav(rendered);
+    }
+
+    function encodeWav(audioBuffer){
+      const numCh = audioBuffer.numberOfChannels;
+      const sampleRate = audioBuffer.sampleRate;
+      const numFrames = audioBuffer.length;
+      const bytesPerSample = 2;
+      const blockAlign = numCh * bytesPerSample;
+      const byteRate = sampleRate * blockAlign;
+      const dataSize = numFrames * blockAlign;
+
+      const buffer = new ArrayBuffer(44 + dataSize);
+      const view = new DataView(buffer);
+
+      // RIFF header
+      writeString(view, 0, 'RIFF');
+      view.setUint32(4, 36 + dataSize, true);
+      writeString(view, 8, 'WAVE');
+
+      // fmt chunk
+      writeString(view, 12, 'fmt ');
+      view.setUint32(16, 16, true);        // PCM chunk size
+      view.setUint16(20, 1, true);         // format = PCM
+      view.setUint16(22, numCh, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, byteRate, true);
+      view.setUint16(32, blockAlign, true);
+      view.setUint16(34, 16, true);        // bits per sample
+
+      // data chunk
+      writeString(view, 36, 'data');
+      view.setUint32(40, dataSize, true);
+
+      // Interleave channel data and write as 16-bit PCM
+      const chData = [];
+      for (let ch=0; ch<numCh; ch++) chData[ch] = audioBuffer.getChannelData(ch);
+
+      let offset = 44;
+      for (let i=0; i<numFrames; i++){
+        for (let ch=0; ch<numCh; ch++){
+          let sample = chData[ch][i];
+          sample = Math.max(-1, Math.min(1, sample));
+          view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+          offset += 2;
+        }
+      }
+      return new Blob([view], { type: 'audio/wav' });
+
+      function writeString(dv, offset, str){
+        for (let i=0;i<str.length;i++) dv.setUint8(offset+i, str.charCodeAt(i));
+      }
+    }
+  </script>
+</body>
+</html>
+

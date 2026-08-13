@@ -1,0 +1,24 @@
+{
+  "name": "litellm-landing",
+  "version": "1.0.0",
+  "description": "Browser test bench for an OpenAI-compatible endpoint: chat, transcription, TTS, embeddings, OCR, PII redaction and realtime",
+  "main": "serve.js",
+  "scripts": {
+    "start": "node serve.js",
+    "test:voice": "node voice/test.js"
+  },
+  "keywords": [
+    "openai",
+    "litellm",
+    "llm",
+    "whisper",
+    "kokoro",
+    "embeddings"
+  ],
+  "author": "Esteban Ordano",
+  "license": "MIT",
+  "type": "commonjs",
+  "devDependencies": {
+    "puppeteer-core": "^24.39.0"
+  }
+}
