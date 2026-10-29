@@ -1,10 +1,10 @@
-const puppeteer = require('puppeteer-core');
+const { chromium } = require('playwright-core');
 const fs = require('fs');
 const path = require('path');
 
 const BASE = process.env.TEST_URL || 'http://localhost:8888/voice/index.html';
 const SCREENSHOT_DIR = process.env.SCREENSHOT_DIR || '/tmp/voice-tests';
-const BROWSER = process.env.BROWSER_PATH || '/etc/profiles/per-user/usr/bin/firefox';
+const BROWSER = process.env.BROWSER_PATH || '/etc/profiles/per-user/usr/bin/chromium';
 
 // Generate a minimal valid WAV file (1 second, 16kHz, 16-bit mono sine wave)
 function generateWav() {
@@ -54,14 +54,12 @@ async function screenshot(page, name) {
   fs.writeFileSync(wavPath, generateWav());
   console.log('Generated test WAV:', wavPath);
 
-  const browser = await puppeteer.launch({
+  const browser = await chromium.launch({
     headless: true,
-    browser: 'firefox',
     executablePath: BROWSER,
   });
 
-  const page = await browser.newPage();
-  await page.setViewport({ width: 1400, height: 900 });
+  const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
 
   const logs = [];
   page.on('console', msg => logs.push(`[${msg.type()}] ${msg.text()}`));
@@ -90,7 +88,7 @@ async function screenshot(page, name) {
   try {
     // ============================================================
     console.log('\n=== TEST 1: Initial page load ===');
-    await page.goto(BASE, { waitUntil: 'networkidle0' });
+    await page.goto(BASE, { waitUntil: 'networkidle' });
     await screenshot(page, 'initial_load');
 
     const recordBtn = await page.$('#recordBtn');
@@ -161,7 +159,7 @@ async function screenshot(page, name) {
     });
 
     const fileInput = await page.$('#fileInput');
-    await fileInput.uploadFile(wavPath);
+    await fileInput.setInputFiles(wavPath);
 
     await screenshot(page, 'after_upload_start');
 
@@ -170,6 +168,7 @@ async function screenshot(page, name) {
         const rows = document.querySelectorAll('#recordings tr');
         return rows.length > 0 && rows[0].textContent.includes('Hello world');
       },
+      undefined,
       { timeout: 10000 }
     );
 
@@ -212,13 +211,14 @@ async function screenshot(page, name) {
     });
 
     const fileInput2 = await page.$('#fileInput');
-    await fileInput2.uploadFile(wavPath);
+    await fileInput2.setInputFiles(wavPath);
 
     await page.waitForFunction(
       () => {
         const rows = document.querySelectorAll('#recordings tr');
         return rows.length >= 2 && rows[0].textContent.includes('fox');
       },
+      undefined,
       { timeout: 10000 }
     );
 
@@ -346,6 +346,7 @@ async function screenshot(page, name) {
         const rows = document.querySelectorAll('#recordings tr');
         return rows.length > 0 && rows[0].textContent.includes('Updated transcription');
       },
+      undefined,
       { timeout: 10000 }
     );
 
@@ -415,7 +416,7 @@ async function screenshot(page, name) {
     // ============================================================
     console.log('\n=== TEST 16: Responsive mobile layout ===');
 
-    await page.setViewport({ width: 400, height: 700 });
+    await page.setViewportSize({ width: 400, height: 700 });
     await sleep(300);
     await screenshot(page, 'mobile_view');
 
@@ -425,7 +426,7 @@ async function screenshot(page, name) {
     });
     assert(mobileControls === 'column', `Controls stack vertically on mobile (direction: ${mobileControls})`);
 
-    await page.setViewport({ width: 1400, height: 900 });
+    await page.setViewportSize({ width: 1400, height: 900 });
 
   } catch (err) {
     console.error('\nERROR:', err.message);

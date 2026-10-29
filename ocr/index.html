@@ -121,6 +121,7 @@
       <a href="../realtime/index.html">Realtime</a>
       <a href="../redact/index.html">Redact</a>
       <a href="#" aria-current="page">OCR</a>
+      <a href="../decide/index.html">Decide</a>
     </nav>
   </header>
 
@@ -168,6 +169,25 @@
 
     <div class="card">
       <h2>Recognized text</h2>
+      <div class="row" style="gap:.6rem;flex-wrap:wrap;margin-bottom:.5rem">
+        <label class="meta">rotate
+          <select id="rotateSel">
+            <option value="">none</option>
+            <option value="cw90">90&deg; cw</option>
+            <option value="180">180&deg;</option>
+            <option value="ccw90">90&deg; ccw</option>
+          </select>
+        </label>
+        <label class="meta">script
+          <select id="scriptSel">
+            <option value="">any</option>
+            <option value="latin">latin</option>
+            <option value="arabic">arabic</option>
+            <option value="cjk">cjk</option>
+            <option value="cyrillic">cyrillic</option>
+          </select>
+        </label>
+      </div>
       <div class="out" id="out"><span class="empty">nothing scanned yet</span></div>
       <div class="legend" id="legend"></div>
       <div class="row">
@@ -311,6 +331,10 @@ async function ocr(blob) {
   const fd = new FormData();
   fd.append('file', blob, 'capture.jpg');
   for (const [k, v] of Object.entries(OCR_PARAMS)) fd.append(k, v);
+  const rotate = $('rotateSel').value;
+  if (rotate) fd.append('rotate', rotate);
+  const script = $('scriptSel').value;
+  if (script) fd.append('script', script);
   const t0 = performance.now();
   const res = await fetch(OCR_URL, { method: 'POST', body: fd });
   if (!res.ok) {
@@ -320,7 +344,12 @@ async function ocr(blob) {
     throw err;
   }
   const data = await res.json();
-  return { data, latencyMs: Math.round(performance.now() - t0) };
+  const flags = {
+    truncated: res.headers.get('x-ocr-truncated') === 'true',
+    looped: res.headers.get('x-ocr-looped') === 'true',
+    suspect: res.headers.get('x-ocr-suspect') || null,
+  };
+  return { data, flags, latencyMs: Math.round(performance.now() - t0) };
 }
 
 function elementsText(data) {
@@ -349,8 +378,11 @@ function renderResult(frame) {
   if (text) { out.textContent = text; $('copyBtn').disabled = false; }
   else { out.innerHTML = '<span class="empty">no text detected</span>'; $('copyBtn').disabled = true; }
   const els = frame.response.elements || [];
+  const flags = frame.flags || {};
   timing.textContent = frame.latencyMs + ' ms · ' + els.length + ' element' + (els.length === 1 ? '' : 's')
-    + (frame.response.truncated ? ' · truncated' : '');
+    + ((flags.truncated || frame.response.truncated) ? ' · truncated' : '')
+    + (flags.looped ? ' · looped' : '')
+    + (flags.suspect ? ' · ⚠ suspect: ' + flags.suspect : '');
   const cats = [...new Set(els.map(e => e.category).filter(Boolean))].sort();
   legend.innerHTML = cats.map(c =>
     '<span><span class="swatch" style="background:' + (CAT_COLORS[c] || '#999') + '"></span>' + c + '</span>').join('');
@@ -365,8 +397,8 @@ async function scanOnce(grabbed) {
     const g = grabbed || await grabFrame();
     if (!g) return null;
     setPill('scanning…');
-    const { data, latencyMs } = await ocr(g.blob);
-    lastFrame = { blob: g.blob, width: g.width, height: g.height, response: data, latencyMs, at: Date.now() };
+    const { data, flags, latencyMs } = await ocr(g.blob);
+    lastFrame = { blob: g.blob, width: g.width, height: g.height, response: data, flags, latencyMs, at: Date.now() };
     renderResult(lastFrame);
     setPill(liveOn ? 'live · ' + latencyMs + ' ms' : null);
     return lastFrame;
@@ -410,6 +442,7 @@ async function saveCapture(frame) {
     at: frame.at,
     endpoint: OCR_URL,
     params: OCR_PARAMS,
+    flags: frame.flags || null,
     latencyMs: frame.latencyMs,
     width: frame.width,
     height: frame.height,

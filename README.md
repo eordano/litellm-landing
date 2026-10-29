@@ -5,23 +5,23 @@ self-contained HTML file -- no build step, no framework, no bundler. Point it at
 speaks the OpenAI API (LiteLLM, vLLM, llama.cpp, Ollama, OpenAI itself) and exercise it from the
 browser.
 
-![Screenshot](./screenshot.png)
 
 ## Pages
 
 | Path | What it exercises |
 | --- | --- |
-| `/` | Chat completions with token usage, tool calling, and reasoning output; TTS; embeddings with a 32x32 visual map; embedding-difference and cosine similarity |
+| `/` | One card per API surface: streamed chat with usage; image and audio questions through the perception bridge (`image_url`/`input_audio` parts on a text-only model); transcription with a `diarized_json` toggle and the transcribe-only `/v1/audio/translations` refusal; TTS (kokoro voices + qwen3-tts 0.6B Base, whose datalist is the enrolled profiles from `GET /v1/voice-profiles`; `default` and the OpenAI aliases always work, via the built-in voice unless a profile named `default` is enrolled); OCR across dots/tesseract/deepseek with `layout-json` and `json-boxes`; inline-highlighted PII spans; two-text embedding cosine; and a live mic card driving `/v1/realtime` for transcription or spoken conversation replies |
 | `/voice/` | Recording or uploading audio and transcribing it |
 | `/realtime/` | Realtime voice chat over a WebSocket |
 | `/ocr/` | Live OCR from an uploaded image |
 | `/read/` | Long-form text reader driven by TTS |
 | `/redact/` | PII detection and redaction |
+| `/decide/` | System One decisions over `/v1/systemone` (the TypeSafe Jev contract): seven editable test cases -- support triage, a German ticket that routes to the multilingual checkpoint, a prompt guard, model routing, a CNC program check, a two-language parts-list match, moderation -- with every answer drawn as its probability distribution, a low-confidence flag, the request as curl and the raw response |
 
 ## Running it
 
 ```
-npm install        # only needed for the puppeteer-based voice test
+pnpm install --frozen-lockfile   # only needed for the playwright-core voice test
 node serve.js
 ```
 
@@ -53,19 +53,25 @@ OpenAI-compatible endpoint.
 
 ## Models
 
-The pages default to the models the reference deployment happens to serve -- `qwen3-8b` for chat,
-faster-whisper distil-large-v3 for transcription, Kokoro-82M for speech, multilingual e5-large for
-embeddings, dots.ocr for OCR. Where a page can enumerate `/v1/models` it offers a dropdown; the
-rest are easy to change by editing the model name in the HTML.
+The pages default to the models the reference deployment serves -- `llm-default` (Laguna-XS) for
+chat, `whisper-1` (faster-whisper large-v3-turbo ct2) for transcription, `kokoro` and
+`qwen3-tts-base-small` for speech, `embedding-default` (Qwen3-Embedding-0.6B) for
+embeddings, and dots/tesseract/deepseek for OCR. Where a page can enumerate `/v1/models` it offers
+a dropdown; the rest are easy to change by editing the model name in the HTML.
+
+The `matches ? 'dark' : 'light'` expression in the index page's theme script is load-bearing: the
+reference deployment's nginx `sub_filter` rewrites it to force dark mode.
 
 ## Tests
 
 ```
-npm run test:voice
+pnpm run test:voice
 ```
 
-Drives `/voice/` with puppeteer-core against a running `serve.js`. Override the target with
-`TEST_URL`.
+Drives `/voice/` in Chromium with playwright-core against a running `serve.js`. Override the target with
+`TEST_URL`, and the browser with `BROWSER_PATH` (a Chromium): playwright-core downloads none, so
+`pnpm-workspace.yaml` allows no dependency build scripts. It also holds back any release younger
+than seven days (`minimumReleaseAge`).
 
 ## Provenance
 

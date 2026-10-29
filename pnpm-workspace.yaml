@@ -1,0 +1,10 @@
+# The pages are dependency-free static HTML; the only package is
+# playwright-core for the voice test (pnpm run test:voice).
+
+# Refuse to resolve any release younger than 7 days (minutes), so a hijacked
+# publish has time to be found and pulled before it can land in the lockfile.
+minimumReleaseAge: 10080
+
+# No dependency lifecycle scripts. playwright-core downloads no browser;
+# voice/test.js drives the Chromium named by BROWSER_PATH.
+allowBuilds: {}

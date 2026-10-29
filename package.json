@@ -1,6 +1,7 @@
 {
   "name": "litellm-landing",
   "version": "1.0.0",
+  "packageManager": "pnpm@12.9.0",
   "description": "Browser test bench for an OpenAI-compatible endpoint: chat, transcription, TTS, embeddings, OCR, PII redaction and realtime",
   "main": "serve.js",
   "scripts": {
@@ -15,10 +16,10 @@
     "kokoro",
     "embeddings"
   ],
-  "author": "Esteban Ordano",
+  "author": "eordano <eordano@gmail.com>",
   "license": "MIT",
   "type": "commonjs",
   "devDependencies": {
-    "puppeteer-core": "^24.39.0"
+    "playwright-core": "^1.64.1"
   }
 }

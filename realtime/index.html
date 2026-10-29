@@ -178,6 +178,7 @@
       <a href="../voice/index.html">Voice</a>
       <a href="#" aria-current="page">Realtime</a>
       <a href="../ocr/index.html">OCR</a>
+      <a href="../decide/index.html">Decide</a>
     </nav>
   </header>
   <main>
@@ -246,7 +247,7 @@ const errorBanner = $('errorBanner'), errorText = $('errorText'), errorDismiss =
 const announcer = $('announcer');
 
 // --- Constants ---
-const MIC_SAMPLE_RATE = 16000;
+const MIC_SAMPLE_RATE = 24000;
 const PLAYBACK_SAMPLE_RATE = 24000;
 const MAX_LOG_ENTRIES = 500;
 const MIC_BUFFER_SIZE = 4096;
@@ -466,9 +467,12 @@ function stopPlayback() {
   audioStreamDone = false;
 }
 
-// --- Mic capture (16 kHz PCM16, echo cancellation enabled) ---
+// --- Mic capture (24 kHz PCM16, echo cancellation enabled) ---
+// 24 kHz because that is what pcm16 means on the wire; sending 16 kHz makes the
+// server read every utterance 1.5x fast, which Whisper survives on a short clip
+// and turns into a repetition loop on a long one.
 // ScriptProcessorNode is deprecated but universal for single-file deployment.
-// At 16 kHz / 4096-sample buffer it fires ~4 times/sec with negligible main-thread cost.
+// At 24 kHz / 4096-sample buffer it fires ~6 times/sec with negligible main-thread cost.
 // Mic is NOT gated on isSpeaking -- the server's VAD must receive audio during playback
 // to detect barge-in. Browser echo cancellation prevents speaker bleed.
 async function startMic() {
@@ -533,7 +537,7 @@ function connect() {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const model = encodeURIComponent(modelInput.value);
   const lang = langSelect.value;
-  let url = `${proto}//${location.host}/v1/realtime?model=${model}`;
+  let url = `${proto}//${location.host}/v1/realtime?model=${model}&intent=conversation`;
   if (lang) url += `&language=${encodeURIComponent(lang)}`;
 
   hideError();
@@ -621,10 +625,11 @@ function handleEvent(ev) {
   if (!ev || !ev.type) return;
   const t = ev.type;
 
-  if (t !== 'response.audio.delta') {
+  if (t !== 'response.audio.delta' && t !== 'response.output_audio.delta') {
     const detail =
       t.includes('transcription') ? (ev.transcript || '').substring(0, 80) :
       t === 'response.audio_transcript.delta' ? ev.delta :
+      t === 'response.output_audio_transcript.delta' ? ev.delta :
       t === 'response.text.delta' ? ev.delta :
       t === 'error' ? ev.error?.message : '';
     log('in', t, detail || '');
@@ -709,6 +714,7 @@ function handleEvent(ev) {
 
     // --- Text streaming ---
     case 'response.audio_transcript.delta':
+    case 'response.output_audio_transcript.delta':
     case 'response.text.delta':
       if (currentAssistantEl && ev.delta) {
         currentAssistantText += ev.delta;
@@ -720,6 +726,7 @@ function handleEvent(ev) {
 
     // --- Audio streaming ---
     case 'response.audio.delta':
+    case 'response.output_audio.delta':
       if (ev.delta && currentAssistantEl) {
         const bytes = decodeBase64PCM(ev.delta);
         if (bytes && bytes.length >= 2) {
@@ -732,6 +739,7 @@ function handleEvent(ev) {
       break;
 
     case 'response.audio.done':
+    case 'response.output_audio.done':
       audioStreamDone = true;
       if (currentAssistantEl && currentAudioChunks.length > 0) {
         const blob = pcmChunksToWav(currentAudioChunks, PLAYBACK_SAMPLE_RATE);
